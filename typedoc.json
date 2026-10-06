@@ -1,0 +1,108 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "@beerwright/core",
+  "entryPoints": [
+    "src/index.ts"
+  ],
+  "out": "site",
+  "readme": "README.md",
+  "projectDocuments": [
+    "docs/guides/start-here.md",
+    "docs/guides/recipe.md",
+    "docs/guides/water.md",
+    "docs/guides/hops.md",
+    "docs/guides/yeast.md",
+    "docs/guides/decoction.md",
+    "docs/guides/packaging.md",
+    "docs/guides/blending.md",
+    "docs/README.md",
+    "docs/gravity-ibu-colour.md",
+    "docs/volumes.md",
+    "docs/instruments.md",
+    "docs/carbonation.md",
+    "docs/decoction.md"
+  ],
+  "excludeInternal": true,
+  "categorizeByGroup": false,
+  "treatWarningsAsErrors": true,
+  "validation": {
+    "notExported": true,
+    "notDocumented": true,
+    "invalidLink": true
+  },
+  "disableGit": true,
+  "sourceLinkTemplate": "https://github.com/beerwright/core/blob/main/{path}#L{line}",
+  "plugin": [
+    "./typedoc/group-sections.mjs"
+  ],
+  "theme": "beerwright",
+  "customCss": "brand/typedoc.css",
+  "favicon": "brand/mark.svg",
+  "headings": {
+    "readme": false,
+    "document": false
+  },
+  "navigationLinks": {
+    "Beerwright": "https://beerwright.com",
+    "Docs": "https://docs.beerwright.com",
+    "GitHub": "https://github.com/beerwright/core"
+  },
+  "hideGenerator": true,
+  "customFooterHtml": "Part of <a href=\"https://beerwright.com\">Beerwright</a>. Apache 2.0.",
+  "lightHighlightTheme": "min-light",
+  "darkHighlightTheme": "min-dark",
+  "alwaysCreateEntryPointModule": false,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": false
+  },
+  "categoryOrder": [
+    "Guides",
+    "How the math works",
+    "Recipe",
+    "Gravity and ABV",
+    "Hops",
+    "Color",
+    "Water and mash pH",
+    "Yeast",
+    "Decoction",
+    "Packaging",
+    "Blending, mead and spirits",
+    "Flavor",
+    "Units",
+    "Explanations and sources"
+  ],
+  "groupOrder": [
+    "Start here",
+    "Calculations",
+    "Inputs",
+    "Results",
+    "Constants and defaults",
+    "Explanations",
+    "*"
+  ],
+  "kindSortOrder": [
+    "Document",
+    "Project",
+    "Module",
+    "Namespace",
+    "Function",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Constructor",
+    "Property",
+    "Accessor",
+    "Method",
+    "Reference"
+  ],
+  "searchGroupBoosts": {
+    "Start here": 3
+  },
+  "searchCategoryBoosts": {
+    "Guides": 2
+  }
+}

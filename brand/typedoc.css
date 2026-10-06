@@ -1,0 +1,439 @@
+/*
+ * Beerwright's look, in TypeDoc's variables.
+ *
+ * Nothing here is a new design. It's the same mapping Beerwright's own docs
+ * site makes onto its generator: the dark theme is the marketing site's
+ * ("the studio at night"), the light theme is the app's, and the type is the
+ * app's pairing, Inter for prose and IBM Plex Mono for code, signatures and
+ * the wordmark, set in caps with wide tracking.
+ *
+ * The accent is achromatic, because the app's primary color is: near-black on
+ * light, near-white on dark. The gold is the pint in the header and nothing
+ * else, so links are told apart by underline and weight. Color comes in only
+ * for alerts, from the app's success, warning and destructive colors.
+ *
+ * TypeDoc defines every color twice (`--light-color-*`, `--dark-color-*`) and
+ * picks a set by the theme switch or the OS setting. Overriding the two sets
+ * covers all three cases. Its own stylesheet is in `@layer typedoc`, so the
+ * plain rules below win without `!important`.
+ */
+
+/* ------------------------------------------------------------------ fonts */
+
+/* Copied to assets/fonts/ by `pnpm run docs`, next to this file's custom.css. */
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter-latin-wght.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F,
+    U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/plex-mono-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/plex-mono-latin-500.woff2") format("woff2");
+}
+
+/* ----------------------------------------------------------------- tokens */
+
+:root {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 0.625rem;
+
+  --dim-toolbar-contents-height: 3.25rem;
+
+  /* Light: the app's `:root`. */
+  --light-color-background: oklch(1 0 0);
+  --light-color-background-secondary: oklch(0.985 0 0);
+  --light-color-background-active: oklch(0.95 0 0);
+  --light-color-background-warning: oklch(0.96 0.04 65);
+  --light-color-warning-text: oklch(0.47 0.12 65);
+  --light-color-accent: oklch(0.922 0 0);
+  --light-color-active-menu-item: oklch(0.95 0 0);
+  --light-color-text: oklch(0.205 0 0);
+  --light-color-contrast-text: oklch(0.145 0 0);
+  --light-color-text-aside: oklch(0.5 0 0);
+  --light-color-icon-background: oklch(1 0 0);
+  --light-color-icon-text: oklch(0.205 0 0);
+  --light-color-comment-tag: oklch(0.97 0 0);
+  --light-color-comment-tag-text: oklch(0.205 0 0);
+  --light-color-link: oklch(0.145 0 0);
+  --light-color-focus-outline: oklch(0.708 0 0);
+  --light-code-background: oklch(0.985 0 0);
+
+  --light-color-ts-keyword: oklch(0.5 0 0);
+  --light-color-ts-project: oklch(0.205 0 0);
+  --light-color-ts-module: oklch(0.205 0 0);
+  --light-color-ts-namespace: oklch(0.205 0 0);
+  --light-color-ts-enum: oklch(0.205 0 0);
+  --light-color-ts-variable: oklch(0.205 0 0);
+  --light-color-ts-function: oklch(0.205 0 0);
+  --light-color-ts-class: oklch(0.205 0 0);
+  --light-color-ts-interface: oklch(0.205 0 0);
+  --light-color-ts-property: oklch(0.205 0 0);
+  --light-color-ts-method: oklch(0.205 0 0);
+  --light-color-ts-reference: oklch(0.205 0 0);
+  --light-color-ts-type-parameter: oklch(0.205 0 0);
+  --light-color-ts-accessor: oklch(0.205 0 0);
+  --light-color-ts-type-alias: oklch(0.205 0 0);
+  --light-color-document: oklch(0.205 0 0);
+
+  --light-color-alert-note: oklch(0.5 0 0);
+  --light-color-alert-tip: oklch(0.58 0.11 165);
+  --light-color-alert-important: oklch(0.205 0 0);
+  --light-color-alert-warning: oklch(0.68 0.15 65);
+  --light-color-alert-caution: oklch(0.577 0.245 27.325);
+
+  /* Dark: the marketing site's tokens. */
+  --dark-color-background: oklch(0.145 0 0);
+  --dark-color-background-secondary: oklch(0.18 0 0);
+  --dark-color-background-active: oklch(0.269 0 0);
+  --dark-color-background-warning: oklch(0.3 0.06 72);
+  --dark-color-warning-text: oklch(0.9 0.1 72);
+  --dark-color-accent: oklch(0.28 0 0);
+  --dark-color-active-menu-item: oklch(0.269 0 0);
+  --dark-color-text: oklch(0.92 0 0);
+  --dark-color-contrast-text: oklch(0.985 0 0);
+  --dark-color-text-aside: oklch(0.708 0 0);
+  --dark-color-icon-background: oklch(0.145 0 0);
+  --dark-color-icon-text: oklch(0.92 0 0);
+  --dark-color-comment-tag: oklch(0.269 0 0);
+  --dark-color-comment-tag-text: oklch(0.92 0 0);
+  --dark-color-link: oklch(0.985 0 0);
+  --dark-color-focus-outline: oklch(0.556 0 0);
+  --dark-code-background: oklch(0.18 0 0);
+
+  --dark-color-ts-keyword: oklch(0.708 0 0);
+  --dark-color-ts-project: oklch(0.92 0 0);
+  --dark-color-ts-module: oklch(0.92 0 0);
+  --dark-color-ts-namespace: oklch(0.92 0 0);
+  --dark-color-ts-enum: oklch(0.92 0 0);
+  --dark-color-ts-variable: oklch(0.92 0 0);
+  --dark-color-ts-function: oklch(0.92 0 0);
+  --dark-color-ts-class: oklch(0.92 0 0);
+  --dark-color-ts-interface: oklch(0.92 0 0);
+  --dark-color-ts-property: oklch(0.92 0 0);
+  --dark-color-ts-method: oklch(0.92 0 0);
+  --dark-color-ts-reference: oklch(0.92 0 0);
+  --dark-color-ts-type-parameter: oklch(0.92 0 0);
+  --dark-color-ts-accessor: oklch(0.92 0 0);
+  --dark-color-ts-type-alias: oklch(0.92 0 0);
+  --dark-color-document: oklch(0.92 0 0);
+
+  --dark-color-alert-note: oklch(0.708 0 0);
+  --dark-color-alert-tip: oklch(0.74 0.13 168);
+  --dark-color-alert-important: oklch(0.92 0 0);
+  --dark-color-alert-warning: oklch(0.81 0.14 72);
+  --dark-color-alert-caution: oklch(0.704 0.191 22.216);
+}
+
+/* ------------------------------------------------------------------ base */
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.tsd-typography {
+  line-height: 1.65;
+}
+
+/* Links: underline and weight, not hue. */
+.tsd-typography a,
+.tsd-comment a,
+.tsd-sources a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in oklch, currentColor 45%, transparent);
+  font-weight: 500;
+}
+
+.tsd-typography a:hover,
+.tsd-comment a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* The external-link arrow repeats what the underline already says. */
+a.external[target="_blank"] {
+  background-image: none;
+  padding-right: 0;
+}
+
+/* ------------------------------------------------------------------- code */
+
+code,
+pre,
+.tsd-signature,
+.tsd-signature-type {
+  font-family: var(--font-mono);
+}
+
+code,
+pre {
+  border-radius: calc(var(--radius) * 0.6);
+}
+
+/* Code keeps its own line breaks. TypeDoc wraps it, which breaks an object
+   literal in the middle and leaves its brace in the first column. */
+pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 1rem 1.125rem;
+  border-radius: var(--radius);
+  background: var(--code-background);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+:not(pre) > code {
+  padding: 0.12em 0.36em;
+  background: var(--color-comment-tag);
+  font-size: 0.875em;
+}
+
+.tsd-signature {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  background: var(--code-background);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.tsd-signatures .tsd-signature {
+  border-width: 1px;
+}
+
+.tsd-signature-type {
+  font-style: normal;
+}
+
+/* A gravity reads as a number, so numbers in tables line up. */
+.tsd-typography table {
+  font-variant-numeric: tabular-nums;
+}
+
+.tsd-typography table,
+.tsd-typography td,
+.tsd-typography th {
+  border-color: var(--color-accent);
+}
+
+.tsd-typography th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.tsd-typography td,
+.tsd-typography th {
+  vertical-align: top;
+  line-height: 1.5;
+  padding: 0.6rem 0.85rem;
+}
+
+/* --------------------------------------------------------------- toolbar */
+
+.tsd-page-toolbar {
+  background: var(--color-background);
+}
+
+/* The wordmark: the pint tile, then the name in Plex Mono caps. */
+.tsd-toolbar-contents > .title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--color-contrast-text);
+}
+
+.tsd-toolbar-contents > .title::before {
+  content: "";
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: url("favicon.svg") center / contain no-repeat;
+}
+
+#tsd-toolbar-links a {
+  font-size: 0.875rem;
+  color: var(--color-text-aside);
+}
+
+#tsd-toolbar-links a:hover {
+  color: var(--color-contrast-text);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+#tsd-search[open],
+#tsd-search-input {
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------- eyebrows */
+
+/*
+ * Section and category headings in the eyebrow style: mono, caps, tracked,
+ * the marketing site's `.eyebrow`.
+ */
+.tsd-panel-group > .tsd-accordion-summary h2,
+.tsd-index-panel .tsd-accordion-summary h2,
+.tsd-index-section > h3,
+.tsd-page-navigation > .tsd-accordion-summary h3,
+.tsd-navigation.settings h3,
+.tsd-member-group > .tsd-accordion-summary h2,
+.settings-label,
+.tsd-panel > h4,
+.tsd-parameters-title,
+.tsd-returns-title,
+.tsd-comment-tags dt,
+.tsd-index-heading {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-aside);
+}
+
+/*
+ * Group subheadings inside a category on the reference page (Start here,
+ * Calculations, Inputs and so on), from typedoc/group-sections.mjs. They sit
+ * a level below the category's eyebrow: sans, small and gray, with a hairline
+ * running to the edge of the column.
+ */
+.bw-group-section {
+  margin-top: 1.25rem;
+}
+
+.bw-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.35rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  color: var(--color-text-aside);
+}
+
+.bw-group-heading::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--color-accent);
+}
+
+/* ------------------------------------------------------------- sidebar */
+
+.tsd-navigation a,
+.tsd-navigation summary > span,
+.tsd-page-navigation a {
+  border-radius: calc(var(--radius) * 0.6);
+  font-size: 0.9rem;
+}
+
+.tsd-navigation a.current,
+.tsd-page-navigation a.current {
+  font-weight: 600;
+}
+
+.tsd-navigation a:hover,
+.tsd-page-navigation a:hover {
+  text-decoration: none;
+  background: var(--color-background-secondary);
+}
+
+/* The project link at the top of the site menu, set like the wordmark. */
+.site-menu > .tsd-navigation > a:first-child {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------- panels */
+
+.tsd-page-title h1 {
+  font-size: 2rem;
+  letter-spacing: -0.025em;
+}
+
+.tsd-alert {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--color-background-secondary);
+}
+
+code.tsd-tag,
+.tsd-flag {
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.tsd-breadcrumb {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------------------- README */
+
+/* The banner sits flush with the text column and keeps its rounded card. */
+.tsd-typography picture img,
+.tsd-typography > p > img:first-child {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+footer {
+  border-top-color: var(--color-accent);
+  padding-inline: 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-aside);
+}
+
+footer a:any-link {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}

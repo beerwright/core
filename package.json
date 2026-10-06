@@ -1,0 +1,55 @@
+{
+  "name": "@beerwright/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure brewing-calculation engine. No DOM, no IO.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abv": "./src/abv.ts",
+    "./carbonation": "./src/carbonation.ts",
+    "./color": "./src/color.ts",
+    "./corrections": "./src/corrections.ts",
+    "./defaults": "./src/defaults.ts",
+    "./explain": "./src/explain.ts",
+    "./flavor": "./src/flavor.ts",
+    "./gravity": "./src/gravity.ts",
+    "./ibu": "./src/ibu.ts",
+    "./mashPh": "./src/mashPh.ts",
+    "./recipe": "./src/recipe.ts",
+    "./reference": "./src/reference.ts",
+    "./sources": "./src/sources.ts",
+    "./types": "./src/types.ts",
+    "./units": "./src/units/index.ts",
+    "./volumes": "./src/volumes.ts",
+    "./water": "./src/water.ts",
+    "./waterSolver": "./src/waterSolver.ts",
+    "./yeast": "./src/yeast.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "docs": "typedoc && pnpm run docs:fonts",
+    "docs:fonts": "node -e \"require('fs').cpSync('brand/fonts', 'site/assets/fonts', { recursive: true })\""
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "typedoc": "0.28.20"
+  },
+  "license": "Apache-2.0",
+  "author": "Chris Main",
+  "homepage": "https://beerwright.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beerwright/core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/beerwright/core/issues"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
