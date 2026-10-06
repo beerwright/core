@@ -1,10 +1,11 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="brand/banner-dark.png">
-  <img alt="@beerwright/core: the brewing math behind Beerwright" src="brand/banner-light.png" width="1280">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/beerwright/core/main/brand/banner-dark.png">
+  <img alt="@beerwright/core: the brewing math behind Beerwright" src="https://raw.githubusercontent.com/beerwright/core/main/brand/banner-light.png" width="1280">
 </picture>
 
 [API reference](https://beerwright.github.io/core/) · [Method notes](docs/README.md) · [Beerwright](https://beerwright.com)
 
+[![npm](https://img.shields.io/npm/v/@beerwright/core?style=flat&label=npm&labelColor=525252&color=171717)](https://www.npmjs.com/package/@beerwright/core)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-171717?style=flat&labelColor=525252)](https://github.com/beerwright/core/blob/main/LICENSE)
 [![Build](https://img.shields.io/github/actions/workflow/status/beerwright/core/docs.yml?branch=main&style=flat&label=build&labelColor=525252&color=171717)](https://github.com/beerwright/core/actions/workflows/docs.yml)
 [![Docs: API reference](https://img.shields.io/badge/docs-API%20reference-171717?style=flat&labelColor=525252)](https://beerwright.github.io/core/)
@@ -50,10 +51,30 @@ inputs it plugged in, and the papers or books the formula is from. The app
 shows these when you open the working behind a number, and you can read them
 here too.
 
+## Install
+
+```sh
+npm install @beerwright/core
+# or
+pnpm add @beerwright/core
+# or
+yarn add @beerwright/core
+```
+
+It's ES modules with the TypeScript types included, and it needs Node 22 or
+later, or any bundler. Everything is exported from `@beerwright/core`, and
+each area is also its own entry point if you only want one, like
+`@beerwright/core/carbonation` or `@beerwright/core/water`.
+
+It's at 0.x because I'm still settling the API, so a new minor version (0.1
+to 0.2) can rename or change things. npm's default `^0.1.0` range stays
+within 0.1.x, so an update won't surprise you. Once the names stop moving
+I'll call it 1.0 and follow semver strictly from there.
+
 ## A quick example
 
 ```ts
-import { calculateRecipe } from './src';
+import { calculateRecipe } from '@beerwright/core';
 
 const result = calculateRecipe({
   batchVolumeL: 20,
@@ -156,11 +177,14 @@ available too. The result always says which one it used.
 
 ## Running it
 
+If you've cloned this repository rather than installed the package:
+
 ```sh
 pnpm install
 pnpm test
 pnpm typecheck
 pnpm run docs    # the API reference, into site/
+pnpm run build   # the npm package, into dist/
 ```
 
 The tests check the math against figures worked out by hand, against

@@ -1,43 +1,21 @@
 {
   "name": "@beerwright/core",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
+  "version": "0.1.0",
   "description": "Pure brewing-calculation engine. No DOM, no IO.",
-  "exports": {
-    ".": "./src/index.ts",
-    "./abv": "./src/abv.ts",
-    "./carbonation": "./src/carbonation.ts",
-    "./color": "./src/color.ts",
-    "./corrections": "./src/corrections.ts",
-    "./defaults": "./src/defaults.ts",
-    "./explain": "./src/explain.ts",
-    "./flavor": "./src/flavor.ts",
-    "./gravity": "./src/gravity.ts",
-    "./ibu": "./src/ibu.ts",
-    "./mashPh": "./src/mashPh.ts",
-    "./recipe": "./src/recipe.ts",
-    "./reference": "./src/reference.ts",
-    "./sources": "./src/sources.ts",
-    "./types": "./src/types.ts",
-    "./units": "./src/units/index.ts",
-    "./volumes": "./src/volumes.ts",
-    "./water": "./src/water.ts",
-    "./waterSolver": "./src/waterSolver.ts",
-    "./yeast": "./src/yeast.ts"
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "docs": "typedoc && pnpm run docs:fonts",
-    "docs:fonts": "node -e \"require('fs').cpSync('brand/fonts', 'site/assets/fonts', { recursive: true })\""
-  },
-  "devDependencies": {
-    "typescript": "7.0.2",
-    "vitest": "4.1.10",
-    "typedoc": "0.28.20"
-  },
+  "keywords": [
+    "brewing",
+    "homebrew",
+    "beer",
+    "mead",
+    "ibu",
+    "abv",
+    "srm",
+    "specific-gravity",
+    "water-chemistry",
+    "mash-ph",
+    "carbonation",
+    "calculator"
+  ],
   "license": "Apache-2.0",
   "author": "Chris Main",
   "homepage": "https://beerwright.com",
@@ -48,8 +26,142 @@
   "bugs": {
     "url": "https://github.com/beerwright/core/issues"
   },
-  "packageManager": "pnpm@11.21.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./abv": {
+      "types": "./dist/abv.d.ts",
+      "import": "./dist/abv.js",
+      "default": "./dist/abv.js"
+    },
+    "./carbonation": {
+      "types": "./dist/carbonation.d.ts",
+      "import": "./dist/carbonation.js",
+      "default": "./dist/carbonation.js"
+    },
+    "./color": {
+      "types": "./dist/color.d.ts",
+      "import": "./dist/color.js",
+      "default": "./dist/color.js"
+    },
+    "./corrections": {
+      "types": "./dist/corrections.d.ts",
+      "import": "./dist/corrections.js",
+      "default": "./dist/corrections.js"
+    },
+    "./defaults": {
+      "types": "./dist/defaults.d.ts",
+      "import": "./dist/defaults.js",
+      "default": "./dist/defaults.js"
+    },
+    "./explain": {
+      "types": "./dist/explain.d.ts",
+      "import": "./dist/explain.js",
+      "default": "./dist/explain.js"
+    },
+    "./flavor": {
+      "types": "./dist/flavor.d.ts",
+      "import": "./dist/flavor.js",
+      "default": "./dist/flavor.js"
+    },
+    "./gravity": {
+      "types": "./dist/gravity.d.ts",
+      "import": "./dist/gravity.js",
+      "default": "./dist/gravity.js"
+    },
+    "./ibu": {
+      "types": "./dist/ibu.d.ts",
+      "import": "./dist/ibu.js",
+      "default": "./dist/ibu.js"
+    },
+    "./mashPh": {
+      "types": "./dist/mashPh.d.ts",
+      "import": "./dist/mashPh.js",
+      "default": "./dist/mashPh.js"
+    },
+    "./recipe": {
+      "types": "./dist/recipe.d.ts",
+      "import": "./dist/recipe.js",
+      "default": "./dist/recipe.js"
+    },
+    "./reference": {
+      "types": "./dist/reference.d.ts",
+      "import": "./dist/reference.js",
+      "default": "./dist/reference.js"
+    },
+    "./sources": {
+      "types": "./dist/sources.d.ts",
+      "import": "./dist/sources.js",
+      "default": "./dist/sources.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
+    "./units": {
+      "types": "./dist/units/index.d.ts",
+      "import": "./dist/units/index.js",
+      "default": "./dist/units/index.js"
+    },
+    "./volumes": {
+      "types": "./dist/volumes.d.ts",
+      "import": "./dist/volumes.js",
+      "default": "./dist/volumes.js"
+    },
+    "./water": {
+      "types": "./dist/water.d.ts",
+      "import": "./dist/water.js",
+      "default": "./dist/water.js"
+    },
+    "./waterSolver": {
+      "types": "./dist/waterSolver.d.ts",
+      "import": "./dist/waterSolver.js",
+      "default": "./dist/waterSolver.js"
+    },
+    "./yeast": {
+      "types": "./dist/yeast.d.ts",
+      "import": "./dist/yeast.js",
+      "default": "./dist/yeast.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "node scripts/build.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "prepublishOnly": "npm run build",
+    "docs": "typedoc && pnpm run docs:fonts",
+    "docs:fonts": "node -e \"require('fs').cpSync('brand/fonts', 'site/assets/fonts', { recursive: true })\""
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "typedoc": "0.28.20"
   }
 }

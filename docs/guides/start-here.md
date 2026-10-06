@@ -12,9 +12,17 @@ It's plain TypeScript with no dependencies and no I/O, so it runs anywhere
 TypeScript does. About seven hundred names are exported, which is a lot to walk
 into cold, so this page is the short way through them.
 
-Everything is exported from `src/index.ts`. The examples on these pages live
-in `docs/examples/` and import from there. I've left the import lines out of
-the snippets, and every name in them comes from that one file.
+It's on npm, so `npm install @beerwright/core` (or `pnpm add` or `yarn add`)
+gets you started. Everything is exported from the package root, so every name
+on these pages comes from one import:
+
+```ts
+import { calculateRecipe, primingSugar } from '@beerwright/core';
+```
+
+I've left that line out of the snippets. The examples themselves live in
+`docs/examples/`, where they import the same names from `src/index.ts`, the
+file behind the package root, so the tests can run them.
 
 ## Three ways in
 
