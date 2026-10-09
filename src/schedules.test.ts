@@ -249,7 +249,7 @@ describe('the fermentation set', () => {
 
     const total = (schedule: NamedSchedule<FermentationStep>) =>
       schedule.steps.reduce((sum, step) => sum + step.days, 0);
-    // The reason to pick it is that the fermenter is free again in two weeks.
+    // The reason to pick it is that the fermenter is free again in under three weeks.
     expect(total(fast)).toBeLessThan(total(classic) / 2);
   });
 

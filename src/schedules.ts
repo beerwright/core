@@ -569,11 +569,11 @@ export const FERMENTATION_SCHEDULES: readonly NamedSchedule<FermentationStep>[] 
     id: 'ferment-fast-lager',
     name: 'Fast lager, warm finish',
     description:
-      'Two weeks instead of six. Warmer primary, a warm finish that doubles as the diacetyl rest, then a short crash. Pick this one when you need the fermenter back. For a pilsner that wants the full schedule, pick the classic profile beside it.',
+      'Under three weeks instead of six. Warmer primary, a week-long warm finish that lets the yeast reach final gravity and doubles as the diacetyl rest, then a short crash. Pick this one when you need the fermenter back. For a pilsner that wants the full schedule, pick the classic profile beside it.',
     kind: 'fermentation',
     steps: [
       { name: 'Primary', type: 'primary', tempC: 13, days: 6 },
-      { name: 'Warm finish', type: 'primary', tempC: 18, days: 4 },
+      { name: 'Warm finish', type: 'primary', tempC: 18, days: 7 },
       { name: 'Cold crash', type: 'lagering', tempC: 2, days: 4 },
     ],
   },
