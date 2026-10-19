@@ -457,6 +457,18 @@ describe('additions of four kinds', () => {
       kegVolumeL: null,
     });
     expect(result.abvWithAdditions).toBeNull();
+    expect(result.finalAbv).toBe(result.abv);
+  });
+
+  it('ends at the ABV with additions when the additions move it', () => {
+    const result = evaluateBlend({
+      components: [base],
+      targetVolumes: 3,
+      additions: [{ kind: 'spirit', name: 'Brandy', volumeL: 0.5, abvPercent: 40 }],
+      kegVolumeL: null,
+    });
+    expect(result.abvWithAdditions).not.toBeNull();
+    expect(result.finalAbv).toBe(result.abvWithAdditions);
   });
 });
 

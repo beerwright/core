@@ -670,6 +670,13 @@ export interface BlendEvaluation {
    * has no ABV, or when nothing that moves it was added.
    */
   readonly abvWithAdditions: number | null;
+  /**
+   * The strength the blend ends up at: {@link abvWithAdditions} when the
+   * additions move it, {@link abv} otherwise. Use this anywhere the blend is
+   * summed up in one figure (lists, labels, feedback cards). The blending
+   * page shows both because it is where the brewer works the additions out.
+   */
+  readonly finalAbv: number | null;
   /** Volume going to keg, in liters, clamped to the blend's total. */
   readonly kegVolumeL: Litres;
   /** Volume left for bottles, in liters. */
@@ -952,6 +959,7 @@ export function evaluateBlend(input: BlendInput): BlendEvaluation {
     additionPrimingSugarKg,
     additionPrimingVolumes,
     abvWithAdditions,
+    finalAbv: abvWithAdditions ?? abv,
     kegVolumeL,
     bottleVolumeL,
   };
