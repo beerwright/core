@@ -622,9 +622,9 @@ export function mixSpiritsExplained(components: readonly SpiritMixComponent[]): 
     },
     unit: '%',
     notes: [
-      'Mass and alcohol add up when liquids are mixed; volume does not. Each liquid is weighed through the OIML density formula, the masses are added, and the total is turned back into a strength and a volume at 20 °C.',
-      'Strengths are % ABV at 20 °C. Liters are corrected from the temperature they were measured at; kilograms need no temperature.',
-      'The formula is for spirit and water. Sugar in a liqueur changes the density and is not counted.',
+      'When you mix liquids, their weights and the alcohol in them add up, but their volumes do not. So we weigh each liquid with the OIML density formula, add the weights and the alcohol, and turn the total back into a strength and a volume at 20 °C.',
+      'We take strengths as % ABV at 20 °C. If you measured in liters, we correct the volume from the temperature you measured at. If you weighed, we don’t need a temperature.',
+      'The formula covers spirit and water only. Sugar in a liqueur makes it heavier, and we don’t count that.',
     ],
     family: 'spirits',
     sources: [OIML_R22_1975],
