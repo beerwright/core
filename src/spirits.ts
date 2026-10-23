@@ -33,13 +33,21 @@
  *
  * Units are litres, kilograms, percent by volume, and grams per litre for the
  * sugar, which is the usual way to state a liqueur's sweetness.
+ *
+ * ## Mixing strengths
+ *
+ * {@link mixSpirits} is the other calculation here, and it does count the
+ * contraction. It mixes any number of spirits and waters by mass, using the
+ * OIML density formula for ethanol and water, so the strength and volume it
+ * gives are what a hydrometer and a measuring jug would read. It has no
+ * sugar in it.
  */
 
 import { WATER_DENSITY_AT_REFERENCE_KG_PER_L } from './corrections';
 import type { Explanation } from './explain';
 import { explain } from './explain';
-import { ASBC_METHODS } from './sources';
-import type { Litres, Percent } from './types';
+import { ASBC_METHODS, OIML_R22_1975 } from './sources';
+import type { Celsius, Kilograms, Litres, Percent } from './types';
 import { platoToSg } from './units/gravity';
 
 // ---------------------------------------------------------------------------
@@ -342,5 +350,283 @@ export function proofAndSweetenExplained(input: ProofAndSweetenInput): Explanati
     ],
     family: 'spirits',
     sources: [ASBC_METHODS],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Ethanol and water
+// ---------------------------------------------------------------------------
+
+// The OIML R 22 coefficients, as printed in the standard and in EU Regulation
+// 2870/2000 Annex I. `A` is the strength term at 20 °C, `B` is pure water's
+// temperature term, and `C[i]` is the cross term for (t − 20)^(i+1).
+const OIML_A = [
+  9.9820123e2, -1.929769495e2, 3.891238958e2, -1.668103923e3, 1.352215441e4, -8.829278388e4,
+  3.062874042e5, -6.138381234e5, 7.470172998e5, -5.478461354e5, 2.234460334e5, -3.903285426e4,
+] as const;
+
+const OIML_B = [
+  -2.061851e-1, -5.268254e-3, 3.613001e-5, -3.89577e-8, 7.169354e-9, -9.973923e-11,
+] as const;
+
+const OIML_C: readonly (readonly number[])[] = [
+  [
+    1.693443461530087e-1, -1.046914743455169e1, 7.196353469546523e1, -7.047478054272792e2,
+    3.924090430035045e3, -1.210164659068747e4, 2.248646550400788e4, -2.605562982188164e4,
+    1.852373922069467e4, -7.420201433430137e3, 1.285617841998974e3,
+  ],
+  [
+    -1.19301300505701e-2, 2.517399633803461e-1, -2.170575700536993, 1.353034988843029e1,
+    -5.029988758547014e1, 1.09635566657757e2, -1.422753946421155e2, 1.08043594285623e2,
+    -4.414153236817392e1, 7.442971530188783,
+  ],
+  [
+    -6.802995733503803e-4, 1.876837790289664e-2, -2.002561813734156e-1, 1.02299296671922,
+    -2.895696483903638, 4.810060584300675, -4.672147440794683, 2.458043105903461,
+    -5.411227621436812e-1,
+  ],
+  [4.075376675622027e-6, -8.76305857347111e-6, 6.515031360099368e-6, -1.51578483698721e-6],
+  [-2.788074354782409e-8, 1.345612883493354e-8],
+];
+
+/** The lowest temperature the OIML formula is fitted for, °C. */
+export const OIML_MIN_TEMP_C = -20;
+
+/** The highest temperature the OIML formula is fitted for, °C. */
+export const OIML_MAX_TEMP_C = 40;
+
+/**
+ * Density of an ethanol and water mixture, kilograms per litre.
+ *
+ * ```
+ * ρ = Σ A_k p^(k−1) + Σ B_k (t − 20)^k + Σ Σ C_ik p^k (t − 20)^i
+ * ```
+ *
+ * `p` is the mass fraction of ethanol, from 0 to 1, and `t` the temperature
+ * in °C. This is the polynomial from OIML R 22, the International
+ * Alcoholometric Tables, which is what printed spirit tables and
+ * alcoholmeters are built from. It is fitted from −20 to 40 °C. It gives
+ * 0.99820 for water and 0.78924 for ethanol at 20 °C.
+ *
+ * Sugar or anything else dissolved in the liquid is outside it.
+ *
+ * @category Blending, mead and spirits
+ * @group Calculations
+ */
+export function ethanolWaterDensityKgPerL(massFraction: number, tempC: Celsius): number {
+  const p = massFraction;
+  const dt = tempC - 20;
+  let rho = 0;
+  OIML_A.forEach((a, k) => {
+    rho += a * p ** k;
+  });
+  OIML_B.forEach((b, k) => {
+    rho += b * dt ** (k + 1);
+  });
+  OIML_C.forEach((row, i) => {
+    row.forEach((c, k) => {
+      rho += c * p ** (k + 1) * dt ** (i + 1);
+    });
+  });
+  // The formula is in kg/m³.
+  return rho / 1000;
+}
+
+/** Pure ethanol at 20 °C, kg/L. */
+const ETHANOL_DENSITY_20C_KG_PER_L = ethanolWaterDensityKgPerL(1, 20);
+
+/**
+ * Converts a mass fraction of ethanol to % ABV.
+ *
+ * ABV is defined at 20 °C: the volume the ethanol would take up on its own at
+ * 20 °C, as a percentage of the mixture's volume at 20 °C. A litre of the
+ * mixture holds `ρ(p) × p` kilograms of ethanol, and that over the density of
+ * pure ethanol is its volume.
+ *
+ * @category Blending, mead and spirits
+ * @group Calculations
+ */
+export function massFractionToAbv(massFraction: number): Percent {
+  return (
+    (100 * massFraction * ethanolWaterDensityKgPerL(massFraction, 20)) /
+    ETHANOL_DENSITY_20C_KG_PER_L
+  );
+}
+
+/**
+ * Converts % ABV to the mass fraction of ethanol, from 0 to 1.
+ *
+ * The inverse of {@link massFractionToAbv}, found by bisection. The relation
+ * rises steadily from 0 to 100 % so bisection always converges, and 60 halvings
+ * is well past the precision of a double.
+ *
+ * @category Blending, mead and spirits
+ * @group Calculations
+ */
+export function abvToMassFraction(abvPercent: Percent): number {
+  if (abvPercent <= 0) return 0;
+  if (abvPercent >= 100) return 1;
+  let low = 0;
+  let high = 1;
+  for (let pass = 0; pass < 60; pass += 1) {
+    const mid = (low + high) / 2;
+    if (massFractionToAbv(mid) < abvPercent) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
+}
+
+// ---------------------------------------------------------------------------
+// Mixing strengths
+// ---------------------------------------------------------------------------
+
+/**
+ * One liquid going into {@link mixSpirits}.
+ *
+ * @category Blending, mead and spirits
+ * @group Inputs
+ */
+export interface SpiritMixComponent {
+  /**
+   * How much, in {@link unit}. Negative takes the liquid out, which is how a
+   * distiller works out what is left in the boiler after running some off.
+   */
+  readonly amount: number;
+  /** Litres or kilograms. */
+  readonly unit: 'L' | 'kg';
+  /**
+   * The temperature the litres were measured at, °C. Ignored for kilograms.
+   * Its strength is always at 20 °C, because that is what ABV means.
+   */
+  readonly tempC: Celsius;
+  /** Strength, % ABV at 20 °C. */
+  readonly abvPercent: Percent;
+}
+
+/**
+ * Result of {@link mixSpirits}.
+ *
+ * @category Blending, mead and spirits
+ * @group Results
+ */
+export interface SpiritMixResult {
+  /** Strength of the mix, % ABV at 20 °C. */
+  readonly abvPercent: Percent;
+  /** Volume of the mix at 20 °C, litres. */
+  readonly volumeL: Litres;
+  /** Mass of the mix, kilograms. */
+  readonly massKg: Kilograms;
+  /** The ethanol in the mix, as litres of pure ethanol at 20 °C. */
+  readonly pureAlcoholL: Litres;
+  /**
+   * What the volumes would add up to at 20 °C if nothing contracted. The
+   * difference from {@link volumeL} is the contraction alone, with the
+   * temperature already taken out.
+   */
+  readonly additiveVolumeL: Litres;
+}
+
+/**
+ * The strength and volume of several spirits and waters mixed together, or
+ * `null` when the mix is impossible.
+ *
+ * ```
+ * m_i     = V_i × ρ(p_i, t_i)        (or the kilograms as given)
+ * p_mix   = Σ m_i p_i / Σ m_i
+ * ABV_mix = massFractionToAbv(p_mix)
+ * V_mix   = Σ m_i / ρ(p_mix, 20 °C)
+ * ```
+ *
+ * Mass and the mass of ethanol both add up when liquids are mixed, but
+ * volume does not. So each liquid is turned into a mass with
+ * {@link ethanolWaterDensityKgPerL} at its own strength and temperature, the
+ * masses are added, and the result is turned back into a strength and a volume
+ * at 20 °C. The contraction falls out of the density formula.
+ *
+ * A litre of 96 % and a litre of water at 20 °C come out as 1.94 L at 49.5 %.
+ * Adding the volumes would say 2 L at 48 %.
+ *
+ * ## When it returns `null`
+ *
+ * With no liquids, a strength outside 0–100 %, or a temperature outside the
+ * formula's −20 to 40 °C. And when negative amounts take out more than is
+ * there: if the total mass isn't above zero, or the alcohol left is less than
+ * none or more than all of it.
+ *
+ * @category Blending, mead and spirits
+ * @group Start here
+ */
+export function mixSpirits(components: readonly SpiritMixComponent[]): SpiritMixResult | null {
+  if (components.length === 0) return null;
+  let massKg = 0;
+  let ethanolKg = 0;
+  let additiveVolumeL = 0;
+  for (const { amount, unit, tempC, abvPercent } of components) {
+    if (!Number.isFinite(amount) || !(abvPercent >= 0 && abvPercent <= 100)) return null;
+    if (unit === 'L' && !(tempC >= OIML_MIN_TEMP_C && tempC <= OIML_MAX_TEMP_C)) return null;
+    const p = abvToMassFraction(abvPercent);
+    const mass = unit === 'kg' ? amount : amount * ethanolWaterDensityKgPerL(p, tempC);
+    massKg += mass;
+    ethanolKg += mass * p;
+    additiveVolumeL += mass / ethanolWaterDensityKgPerL(p, 20);
+  }
+  if (!(massKg > 0)) return null;
+  const p = ethanolKg / massKg;
+  // A small tolerance either side, so that a mix that rounds to exactly 0 or
+  // 100 % isn't refused over floating-point dust.
+  if (p < -1e-12 || p > 1 + 1e-12) return null;
+  const fraction = Math.min(1, Math.max(0, p));
+  return {
+    abvPercent: massFractionToAbv(fraction),
+    volumeL: massKg / ethanolWaterDensityKgPerL(fraction, 20),
+    massKg,
+    pureAlcoholL: Math.max(0, ethanolKg) / ETHANOL_DENSITY_20C_KG_PER_L,
+    additiveVolumeL,
+  };
+}
+
+/**
+ * The strength of a mix with its breakdown, or `null` when {@link mixSpirits}
+ * returns `null`.
+ *
+ * The strength is the main value. The volume, the mass and the contraction go
+ * in the inputs, with one row per liquid.
+ *
+ * @category Blending, mead and spirits
+ * @group Explanations
+ */
+export function mixSpiritsExplained(components: readonly SpiritMixComponent[]): Explanation | null {
+  const result = mixSpirits(components);
+  if (result === null) return null;
+  const liquids = Object.fromEntries(
+    components.map((component, index) => [
+      `liquid${index + 1}`,
+      component.unit === 'kg'
+        ? `${round(component.amount, 3)} kg at ${round(component.abvPercent, 1)} %`
+        : `${round(component.amount, 3)} L at ${round(component.tempC, 1)} °C, ${round(component.abvPercent, 1)} %`,
+    ]),
+  );
+  return explain(result.abvPercent, {
+    label: 'Strength of the mix',
+    formula: 'oiml-r22-mix',
+    expression:
+      'ABV = 100 × p × ρ(p, 20 °C) / ρ(ethanol, 20 °C), with p = Σ ethanol mass / Σ mass and ρ from OIML R 22',
+    inputs: {
+      ...liquids,
+      massKg: round(result.massKg, 3),
+      ethanolMassFraction: round(abvToMassFraction(result.abvPercent), 4),
+      volumeL: round(result.volumeL, 3),
+      additiveVolumeL: round(result.additiveVolumeL, 3),
+      contractionL: round(result.additiveVolumeL - result.volumeL, 3),
+      pureAlcoholL: round(result.pureAlcoholL, 3),
+    },
+    unit: '%',
+    notes: [
+      'Mass and alcohol add up when liquids are mixed; volume does not. Each liquid is weighed through the OIML density formula, the masses are added, and the total is turned back into a strength and a volume at 20 °C.',
+      'Strengths are % ABV at 20 °C. Liters are corrected from the temperature they were measured at; kilograms need no temperature.',
+      'The formula is for spirit and water. Sugar in a liqueur changes the density and is not counted.',
+    ],
+    family: 'spirits',
+    sources: [OIML_R22_1975],
   });
 }

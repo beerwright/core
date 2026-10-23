@@ -580,3 +580,21 @@ export const MARGALIT_WINE_CHEMISTRY_2004: Source = {
   author: 'Yair Margalit',
   year: 2004,
 };
+
+// ---------------------------------------------------------------------------
+// Spirits
+// ---------------------------------------------------------------------------
+
+/**
+ * The density of ethanol and water at a strength and temperature, as a
+ * polynomial. The same formula and coefficients are written into EU
+ * Regulation 2870/2000 for official spirit analysis.
+ *
+ * @category Explanations and sources
+ * @group Constants and defaults
+ */
+export const OIML_R22_1975: Source = {
+  title: 'International Alcoholometric Tables (OIML R 22)',
+  author: 'International Organization of Legal Metrology',
+  year: 1975,
+};

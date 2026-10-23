@@ -60,7 +60,8 @@ export interface Source {
  *
  * `cellar` holds the numbers that meads, ciders and wines need and beers
  * mostly don't. `spirits` covers proofing a macerate down and sweetening it,
- * which is the only thing on the list that isn't fermented.
+ * and mixing spirits by strength, which are the only things on the list that
+ * aren't fermented.
  *
  * @category Explanations and sources
  * @group Explanations
@@ -125,7 +126,7 @@ export const EXPLANATION_FAMILY_LABELS: Readonly<Record<ExplanationFamily, strin
   freshness: 'Hop freshness',
   blending: 'Blending arithmetic',
   cellar: 'Must, nutrients and stabilizing',
-  spirits: 'Proofing and sweetening',
+  spirits: 'Proofing, sweetening and mixing',
   volumes: 'Volumes and losses',
   decoction: 'Decoctions',
 };

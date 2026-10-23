@@ -37,8 +37,8 @@ import { nutrientScheduleExplained, sugarToGravityExplained } from './must';
 import type { PearsonSquareInput } from './pearson';
 import { pearsonSquareExplained } from './pearson';
 import { calculateRecipe } from './recipe';
-import type { ProofAndSweetenInput } from './spirits';
-import { proofAndSweetenExplained } from './spirits';
+import type { ProofAndSweetenInput, SpiritMixComponent } from './spirits';
+import { mixSpiritsExplained, proofAndSweetenExplained } from './spirits';
 import type { SorbateDoseInput, SulfiteDoseInput } from './stabilising';
 import { sorbateDoseExplained, sulfiteDoseExplained } from './stabilising';
 import type { StarterPlanOptions } from './starter';
@@ -164,6 +164,8 @@ export interface ReferenceExample {
    * reference that isn't fermented.
    */
   readonly proofAndSweeten?: ProofAndSweetenInput;
+  /** Spirits mixed by strength, with the contraction counted. */
+  readonly mixing?: readonly SpiritMixComponent[];
 }
 
 /**
@@ -277,6 +279,10 @@ export function referenceExplanations(example: ReferenceExample): readonly Expla
     // down to the target strength, there's no volume to publish.
     const spirit = proofAndSweetenExplained(example.proofAndSweeten);
     if (spirit) out.push(spirit);
+  }
+  if (example.mixing) {
+    const mix = mixSpiritsExplained(example.mixing);
+    if (mix) out.push(mix);
   }
 
   return out;

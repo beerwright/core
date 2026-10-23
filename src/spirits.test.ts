@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abvToMassFraction,
   dissolvedSugarVolumeLPerKg,
+  ethanolWaterDensityKgPerL,
+  massFractionToAbv,
+  mixSpirits,
+  mixSpiritsExplained,
   proofAndSweeten,
   proofAndSweetenExplained,
   sugarConcentrationToBrix,
@@ -154,5 +159,117 @@ describe('proofAndSweetenExplained', () => {
         sweetener: { kind: 'sugar' },
       }),
     ).toBeNull();
+  });
+});
+
+describe('ethanolWaterDensityKgPerL', () => {
+  // Figures from the International Alcoholometric Tables at 20 °C.
+  it('gives water and ethanol their tabled densities', () => {
+    expect(ethanolWaterDensityKgPerL(0, 20)).toBeCloseTo(0.9982, 5);
+    expect(ethanolWaterDensityKgPerL(1, 20)).toBeCloseTo(0.78924, 5);
+  });
+
+  it('puts water at its densest near 4 °C and lighter at 40', () => {
+    expect(ethanolWaterDensityKgPerL(0, 4)).toBeGreaterThan(ethanolWaterDensityKgPerL(0, 0));
+    expect(ethanolWaterDensityKgPerL(0, 4)).toBeGreaterThan(ethanolWaterDensityKgPerL(0, 10));
+    expect(ethanolWaterDensityKgPerL(0, 40)).toBeCloseTo(0.99222, 3);
+  });
+
+  it('gives a 40 % spirit its tabled density', () => {
+    expect(ethanolWaterDensityKgPerL(abvToMassFraction(40), 20)).toBeCloseTo(0.94805, 4);
+  });
+});
+
+describe('abvToMassFraction', () => {
+  it.each([
+    [40, 0.333],
+    [50, 0.4243],
+    [96, 0.9384],
+  ])('reads %d %% vol as the tabled mass fraction', (abv, fraction) => {
+    expect(abvToMassFraction(abv)).toBeCloseTo(fraction, 3);
+  });
+
+  it('round-trips through massFractionToAbv', () => {
+    for (const abv of [0.5, 12, 30, 60, 96.5]) {
+      expect(massFractionToAbv(abvToMassFraction(abv))).toBeCloseTo(abv, 9);
+    }
+  });
+
+  it('pins the ends', () => {
+    expect(abvToMassFraction(0)).toBe(0);
+    expect(abvToMassFraction(100)).toBe(1);
+  });
+});
+
+describe('mixSpirits', () => {
+  const at20 = (amount: number, abvPercent: number) =>
+    ({ amount, unit: 'L', tempC: 20, abvPercent }) as const;
+
+  it('counts the contraction: a litre of 96 % and a litre of water make 1.94 L at 49.5 %', () => {
+    const mix = mixSpirits([at20(1, 96), at20(1, 0)]);
+    expect(mix?.abvPercent).toBeCloseTo(49.5, 1);
+    expect(mix?.volumeL).toBeCloseTo(1.939, 3);
+    expect(mix?.additiveVolumeL).toBeCloseTo(2, 9);
+    expect(mix?.pureAlcoholL).toBeCloseTo(0.96, 9);
+  });
+
+  it('shrinks equal volumes of ethanol and water by about 3.5 %', () => {
+    const mix = mixSpirits([at20(0.5, 100), at20(0.5, 0)]);
+    expect(mix?.volumeL).toBeCloseTo(0.9646, 4);
+  });
+
+  it('gives back a single liquid unchanged', () => {
+    const mix = mixSpirits([at20(0.7, 40)]);
+    expect(mix?.abvPercent).toBeCloseTo(40, 9);
+    expect(mix?.volumeL).toBeCloseTo(0.7, 9);
+  });
+
+  it('takes a liquid in kilograms the same as the litres it weighs', () => {
+    const litres = mixSpirits([at20(1, 60), at20(1, 0)]);
+    const kgOf60 = ethanolWaterDensityKgPerL(abvToMassFraction(60), 20);
+    const kilograms = mixSpirits([
+      { amount: kgOf60, unit: 'kg', tempC: 35, abvPercent: 60 },
+      at20(1, 0),
+    ]);
+    expect(kilograms?.abvPercent).toBeCloseTo(litres?.abvPercent ?? 0, 9);
+    expect(kilograms?.volumeL).toBeCloseTo(litres?.volumeL ?? 0, 9);
+  });
+
+  it('corrects litres measured cold to their volume at 20 °C', () => {
+    const cold = mixSpirits([{ amount: 1, unit: 'L', tempC: 10, abvPercent: 40 }]);
+    // Denser when cold, so a litre measured at 10 °C is more than a litre at 20.
+    expect(cold?.volumeL).toBeGreaterThan(1.006);
+    expect(cold?.abvPercent).toBeCloseTo(40, 9);
+  });
+
+  it('takes a negative amount out of the mix', () => {
+    // Ten litres of 10 % wash with a litre of 70 % run off leaves it weaker.
+    const left = mixSpirits([at20(10, 10), at20(-1, 70)]);
+    expect(left?.abvPercent).toBeGreaterThan(3);
+    expect(left?.abvPercent).toBeLessThan(4);
+  });
+
+  it('refuses a mix with nothing in it, or less than nothing', () => {
+    expect(mixSpirits([])).toBeNull();
+    expect(mixSpirits([at20(1, 40), at20(-1, 40)])).toBeNull();
+    expect(mixSpirits([at20(1, 40), at20(-2, 0)])).toBeNull();
+  });
+
+  it('refuses taking out more alcohol than is there', () => {
+    expect(mixSpirits([at20(2, 10), at20(-0.5, 96)])).toBeNull();
+  });
+
+  it('refuses a temperature outside the formula, but not for kilograms', () => {
+    expect(mixSpirits([{ amount: 1, unit: 'L', tempC: 60, abvPercent: 40 }])).toBeNull();
+    expect(mixSpirits([{ amount: 1, unit: 'kg', tempC: 60, abvPercent: 40 }])).not.toBeNull();
+  });
+
+  it('explains itself with one row per liquid', () => {
+    const explanation = mixSpiritsExplained([at20(1, 96), at20(1, 0)]);
+    expect(explanation?.value).toBeCloseTo(49.5, 1);
+    expect(explanation?.inputs.liquid1).toBe('1 L at 20 °C, 96 %');
+    expect(explanation?.inputs.liquid2).toBe('1 L at 20 °C, 0 %');
+    expect(explanation?.family).toBe('spirits');
+    expect(mixSpiritsExplained([])).toBeNull();
   });
 });
