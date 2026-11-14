@@ -30,7 +30,13 @@ import {
   totalCarbonateMMolPerLitre,
 } from './mashPh';
 import type { AcidId, FermentableAddition, WaterProfile } from './types';
-import { RO_WATER, waterProfile } from './water';
+import {
+  alkalinityMEqPerLitre,
+  applySalts,
+  KOLBACH_CALCIUM_DIVISOR,
+  RO_WATER,
+  waterProfile,
+} from './water';
 
 // ---------------------------------------------------------------------------
 // Grists used throughout
@@ -871,5 +877,98 @@ describe('options', () => {
       options: { acidulatedMaltPercentLactic: 2 },
     }).ph;
     expect(at2).toBeGreaterThan(at3);
+  });
+});
+
+describe('a malt with "barley" in its name', () => {
+  const named = (name: string, colorLovibond: number): FermentableAddition => ({
+    name,
+    amountKg: 1,
+    colorLovibond,
+    class: 'grain',
+    use: 'mash',
+    ppg: 36,
+  });
+
+  it.each([
+    ['Pale Malt (2-Row Barley)', 2, 'base'],
+    ['Golden Promise Barley Malt', 3, 'base'],
+    ['Black Barley', 500, 'roasted'],
+    ['Flaked Barley', 2, 'wheat-other'],
+    ['Unmalted Barley', 2, 'wheat-other'],
+  ] as const)('%s is %s', (name, lovibond, expected) => {
+    expect(inferMaltPhClass(named(name, lovibond))).toBe(expected);
+  });
+});
+
+describe('slaked lime is hydroxide', () => {
+  /**
+   * 2 g of Ca(OH)₂ in 15 L: `2 × 2000 / 74.093 = 53.99 mEq`, or 3.599 mEq/L.
+   * The profile carries it as bicarbonate and marks how much is hydroxide.
+   */
+  const limed = applySalts({
+    source: RO_WATER,
+    additions: [{ salt: 'slaked-lime', grams: 2, target: 'mash' }],
+    volumes: { mashVolumeL: 15, spargeVolumeL: 0 },
+  }).mash;
+  const { hydroxideMEqPerL: _marked, ...asBicarbonate } = limed;
+
+  it('is marked on the treated water', () => {
+    expect(limed.hydroxideMEqPerL).toBeCloseTo(3.599, 3);
+    expect(alkalinityMEqPerLitre(limed)).toBeCloseTo(3.599, 3);
+  });
+
+  it('is not marked for baking soda', () => {
+    const soda = applySalts({
+      source: RO_WATER,
+      additions: [{ salt: 'baking-soda', grams: 2, target: 'mash' }],
+      volumes: { mashVolumeL: 15, spargeVolumeL: 0 },
+    }).mash;
+    expect(soda.hydroxideMEqPerL).toBeUndefined();
+  });
+
+  it('gives the mash all of its alkalinity, where bicarbonate holds some back', () => {
+    const withHydroxide = predictMashPh({ grist: PILSNER_GRIST, water: limed, mashVolumeL: 15 });
+    const withBicarbonate = predictMashPh({
+      grist: PILSNER_GRIST,
+      water: asBicarbonate,
+      mashVolumeL: 15,
+    });
+    expect(Math.abs(withHydroxide.contributions.waterAlkalinityMEq)).toBeCloseTo(53.99, 1);
+    const share =
+      withBicarbonate.contributions.waterAlkalinityMEq /
+      withHydroxide.contributions.waterAlkalinityMEq;
+    // The share bicarbonate gives up depends on where the pH lands: about
+    // 89 % at 5.4, and less in this pale mash, which settles near 6.
+    expect(share).toBeGreaterThan(0.6);
+    expect(share).toBeLessThan(0.95);
+    expect(withHydroxide.ph).toBeGreaterThan(withBicarbonate.ph);
+  });
+
+  /**
+   * In RO water the dose is the grist's buffering over the rise, divided by
+   * what a gram delivers. A gram is 26.99 mEq of base, less the calcium it
+   * brings, which gives back `1 / 3.5` of that through Kolbach's term.
+   */
+  it('doses to the target by its full strength', () => {
+    const grist = [grain('Pale Malt', 4, 3), grain('Roasted Barley', 1, 500)];
+    const solution = solveAdditionsForTargetPh({
+      targetPh: 5.4,
+      agent: { kind: 'alkali', salt: 'slaked-lime' },
+      grist,
+      water: RO_WATER,
+      mashVolumeL: 15,
+    });
+    expect(solution.baselinePh).toBeLessThan(5.4);
+    const buffering = resolveMaltTitrations(grist).reduce((sum, t) => sum + t.bufferingMEqPerPh, 0);
+    const perGram =
+      alkaliBaseMEqPerGramAtPh('slaked-lime', 5.4) * (1 - 1 / KOLBACH_CALCIUM_DIVISOR);
+    expect(solution.amount).toBeCloseTo((buffering * (5.4 - solution.baselinePh)) / perGram, 2);
+    expect(solution.achievedPh).toBeCloseTo(5.4, 4);
+  });
+
+  it('takes its full alkalinity in acid when the water is acidified', () => {
+    const acid = acidifyWater({ profile: limed, volumeL: 15, targetPh: 5.5 });
+    expect(acid.milliequivalents).toBeCloseTo(53.99, 1);
   });
 });

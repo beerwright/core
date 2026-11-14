@@ -37,6 +37,7 @@
  */
 
 import { resolveEquipmentProfile } from './defaults';
+import { inferMaltPhClass } from './mashPh';
 import type { RecipeCalculation } from './recipe';
 import { planStarter } from './starter';
 import type {
@@ -549,7 +550,7 @@ export function recipeChecks(input: RecipeCheckInput): RecipeCheckResult {
 
   // --- Pitch. Needs a yeast, a gravity, a volume and a date. If any is
   // missing, the check is skipped.
-  const pitch = pitchFinding(input, equipment.fermenterTrubLossL);
+  const pitch = pitchFinding(input);
   if (pitch !== null) findings.push(pitch);
 
   // --- Ferment temperature against each yeast's range. These are notes,
@@ -575,21 +576,26 @@ function isAcidified(recipe: RecipeInput): boolean {
   return recipe.fermentables.some(hasLacticAcid);
 }
 
-/** Acidulated malt, or any fermentable carrying a lactic-acid content. */
+/**
+ * Acidulated malt, or any fermentable carrying a lactic-acid content.
+ *
+ * The class comes from `inferMaltPhClass`, the same call the mash pH
+ * prediction makes, so a row typed in as "Acidulated Malt" with no catalog
+ * data counts here whenever it counts there.
+ */
 function hasLacticAcid(fermentable: FermentableAddition): boolean {
-  const ph = fermentable.ph;
-  if (ph === undefined) return false;
-  if (ph.maltClass === 'acidulated') return true;
-  return (ph.acidContentPercentLactic ?? 0) > 0;
+  if (inferMaltPhClass(fermentable) === 'acidulated') return true;
+  return (fermentable.ph?.acidContentPercentLactic ?? 0) > 0;
 }
 
 /**
  * The pitch finding, or `null` if a required input is missing.
  *
- * The volume is the wort that reaches the yeast: the volume into the
- * fermenter, minus the trub left behind. The gravity is the OG, which is what
- * a pitch rate is defined against. Both come from the calculation, and the
- * arithmetic is in `yeast.ts`.
+ * The volume is everything that goes into the fermenter, because the yeast
+ * ferments all of it. The trub left behind at packaging is lost afterwards, so
+ * it still counts here. The gravity is the OG, which is what a pitch rate is
+ * defined against. Both come from the calculation, and the arithmetic is in
+ * `yeast.ts`.
  *
  * The remedy comes from `starter.ts`. A liquid pack short of a lager pitch is
  * usually a step or two on a stir plate away. Dry yeast never gets a starter.
@@ -601,13 +607,13 @@ function hasLacticAcid(fermentable: FermentableAddition): boolean {
  * `PITCH_ADEQUATE_FRACTION` and this returns `null`. A starter that falls
  * short still produces a finding, and the remedy says which case it is.
  */
-function pitchFinding(input: RecipeCheckInput, trubLossL: Litres): RecipeCheck | null {
+function pitchFinding(input: RecipeCheckInput): RecipeCheck | null {
   const { recipe, calculation, now } = input;
   const yeasts = recipe.yeasts ?? [];
   if (now === undefined || yeasts.length === 0) return null;
 
   const og: SpecificGravity = calculation.vitals.og;
-  const volumeL = calculation.volumes.volumeIntoFermenterL - trubLossL;
+  const volumeL = calculation.volumes.volumeIntoFermenterL;
   if (!Number.isFinite(og) || og <= 1 || volumeL <= 0) return null;
 
   // Dry yeast is judged by mass against its maker's dosage, never by cell

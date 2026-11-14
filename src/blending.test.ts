@@ -787,3 +787,61 @@ describe('a hop in the blend', () => {
     expect(late.additionPrimingVolumes).toBe(0);
   });
 });
+
+describe('ABV when additions went in before the reading', () => {
+  const beer: BlendComponentInput = {
+    name: 'Base',
+    volumeL: 10,
+    og: 1.05,
+    fg: 1.01,
+    ph: null,
+    srm: null,
+    peakTempC: 20,
+    barrelAged: false,
+    naohMl: null,
+  };
+  const read = { measuredFg: 1.01, measuredOn: new Date('2026-09-10') };
+  const before = new Date('2026-09-01');
+  const after = new Date('2026-09-15');
+
+  it('dilutes the components by juice at the same gravity instead of stacking it on top', () => {
+    // Ten litres at 1.050 plus ten litres of juice at 1.050 is twenty litres
+    // at 1.050, so the strength is the beer's own.
+    const blended = evaluateBlend({
+      components: [beer],
+      targetVolumes: 3,
+      additions: [{ kind: 'fruit', name: 'Juice', volumeL: 10, sg: 1.05, addedOn: before }],
+      ...read,
+      kegVolumeL: null,
+    });
+    expect(blended.abv ?? 0).toBeCloseTo(abvAdvanced(1.05, 1.01), 6);
+  });
+
+  it('counts a spirit the hydrometer cannot see', () => {
+    const spirit = { kind: 'spirit', name: 'Brandy', volumeL: 2, abvPercent: 40 } as const;
+    const fortified = evaluateBlend({
+      components: [beer],
+      targetVolumes: 3,
+      additions: [{ ...spirit, addedOn: before }],
+      ...read,
+      kegVolumeL: null,
+    });
+    // The spirit alone puts 2 × 40 / 12 = 6.7 points of alcohol in the vessel.
+    expect(fortified.finalAbv ?? 0).toBeGreaterThan((2 * 40) / 12);
+    // What fermentation adds on top is less than the unfortified beer's
+    // strength, because the spirit thinned the wort it came from.
+    expect(fortified.finalAbv ?? 0).toBeLessThan((2 * 40) / 12 + abvAdvanced(1.05, 1.01));
+
+    const later = evaluateBlend({
+      components: [beer],
+      targetVolumes: 3,
+      additions: [{ ...spirit, addedOn: after }],
+      ...read,
+      kegVolumeL: null,
+    });
+    // Dated after the reading, the same pour lands on beer that really is at
+    // 1.010, so it is the stronger of the two, but not by half.
+    expect(later.finalAbv ?? 0).toBeGreaterThan(fortified.finalAbv ?? 0);
+    expect((later.finalAbv ?? 0) - (fortified.finalAbv ?? 0)).toBeLessThan(2.5);
+  });
+});

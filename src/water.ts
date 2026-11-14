@@ -1296,20 +1296,35 @@ export function applySalts(input: {
   // `mashPh` (how much of the reported alkalinity is bicarbonate and how much
   // is carbonate), and that needs the measured figure. See
   // `totalCarbonateMMolPerLitre`.
-  const mash = withPh(
-    addProfiles(input.source, fromIonAmounts(ionsFromSalts(mashAdditions, mashVolumeL))),
-    input.source.ph,
+  const mashHydroxide =
+    (input.source.hydroxideMEqPerL ?? 0) + hydroxideMEqPerLitre(mashAdditions, mashVolumeL);
+  const spargeHydroxide =
+    (spargeSource.hydroxideMEqPerL ?? 0) + hydroxideMEqPerLitre(spargeAdditions, spargeVolumeL);
+  const mash = withHydroxide(
+    withPh(
+      addProfiles(input.source, fromIonAmounts(ionsFromSalts(mashAdditions, mashVolumeL))),
+      input.source.ph,
+    ),
+    mashHydroxide,
   );
-  const sparge = withPh(
-    addProfiles(spargeSource, fromIonAmounts(ionsFromSalts(spargeAdditions, spargeVolumeL))),
-    spargeSource.ph,
+  const sparge = withHydroxide(
+    withPh(
+      addProfiles(spargeSource, fromIonAmounts(ionsFromSalts(spargeAdditions, spargeVolumeL))),
+      spargeSource.ph,
+    ),
+    spargeHydroxide,
   );
-  const total = withPh(
-    blendProfiles([
-      { profile: mash, volumeL: mashVolumeL },
-      { profile: sparge, volumeL: spargeVolumeL },
-    ]),
-    input.source.ph === spargeSource.ph ? input.source.ph : undefined,
+  const total = withHydroxide(
+    withPh(
+      blendProfiles([
+        { profile: mash, volumeL: mashVolumeL },
+        { profile: sparge, volumeL: spargeVolumeL },
+      ]),
+      input.source.ph === spargeSource.ph ? input.source.ph : undefined,
+    ),
+    totalVolumeL > 0
+      ? (mashHydroxide * mashVolumeL + spargeHydroxide * spargeVolumeL) / totalVolumeL
+      : 0,
   );
 
   const warnings: string[] = [];
@@ -1465,6 +1480,37 @@ function clamp(value: number, min: number, max: number): number {
 /** Attach a pH to a profile, omitting the key entirely when there is none. */
 function withPh(profile: WaterProfile, ph: number | undefined): WaterProfile {
   return ph === undefined ? profile : { ...profile, ph };
+}
+
+/**
+ * Salts whose alkalinity is hydroxide. The profile stores it as bicarbonate,
+ * and `hydroxideMEqPerL` records how much of that figure it accounts for.
+ */
+const HYDROXIDE_SALTS: ReadonlySet<SaltId> = new Set<SaltId>(['slaked-lime']);
+
+/**
+ * Hydroxide alkalinity a set of salt additions puts into a volume, mEq/L.
+ *
+ * @category Water and mash pH
+ * @group Calculations
+ */
+export function hydroxideMEqPerLitre(additions: readonly SaltAddition[], volumeL: Litres): number {
+  if (volumeL <= 0) return 0;
+  let mEq = 0;
+  for (const addition of additions) {
+    if (!HYDROXIDE_SALTS.has(addition.salt)) continue;
+    const def = SALT_DEFINITIONS[addition.salt];
+    const grams = addition.grams * (addition.dissolvedFraction ?? 1);
+    mEq += (grams * 1000 * def.alkalinityEqPerMol) / def.molarMassGPerMol;
+  }
+  return mEq / volumeL;
+}
+
+function withHydroxide(profile: WaterProfile, hydroxideMEqPerL: number): WaterProfile {
+  // Blending and adding profiles rebuild the object from its ions, so the
+  // field is dropped first and only written back when there is some.
+  const { hydroxideMEqPerL: _dropped, ...rest } = profile;
+  return hydroxideMEqPerL > 0 ? { ...rest, hydroxideMEqPerL } : rest;
 }
 
 function round(value: number, dp: number): number {

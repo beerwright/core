@@ -47,35 +47,42 @@ the original reading. The engine uses Sean Terrill's linear regression against
 measured hydrometer data ("Refractometer FG Results", seanterrill.com):
 
 ```
+FG = 1.0000 − 0.00085683·OB + 0.0034941·FB
+```
+
+`OB` and `FB` are the **corrected** Brix readings (original and final, both
+divided by the WCF), which is how Terrill defines them. You can pass raw
+instrument readings instead, and the factor is applied to both.
+
+| Original Brix | Final Brix | FG |
+| --- | --- | --- |
+| 12 | 6.5 | 1.0124 |
+| 12 | 7 | 1.0142 |
+| 16 | 9 | 1.0177 |
+
+### Where it holds
+
+Terrill fitted it to beers that had fermented most of the way and checked it
+against 68 sets of readings from eight brewers. He left out four beers under
+about 61 % apparent attenuation, because no correlation came close on them. So
+it is a final-gravity formula. On a sample early in fermentation it reads low,
+and for a wort that hasn't fermented at all it is about 17 points low at
+12 °Bx.
+
+### The older correlation
+
+The engine also carries the cubic that most brewing software used before 2011,
+as the `standard-cubic` model:
+
+```
 FG = 1.001843 − 0.002318474·OB − 0.000007775·OB² − 0.000000034·OB³
               + 0.00574·FB    + 0.00003344·FB²  + 0.000000086·FB³
 ```
 
-`OB` and `FB` are the **corrected** Brix readings (original and final, both
-divided by the WCF), which is how Brewer's Friend and Brewfather apply the same
-model. You can pass raw instrument readings instead, and the factor is applied
-to both.
-
-It's called "linear" in the regression sense. The polynomial isn't first-order.
-
-| Original Brix | Final Brix | FG |
-| --- | --- | --- |
-| 12 | 6.5 | 1.0116 |
-| 12 | 7 | 1.0147 |
-| 16 | 9 | 1.0170 |
-
-### The rejected model
-
-We tried a second, widely circulated "Terrill cubic" and didn't use it. As
-transcribed it returns SG below 1.000 and implied attenuations above 100 % for
-strong beers, so its coefficients can't be right.
-
-The tests set the standard any replacement has to meet. Given `OB = FB` (a
-sample that hasn't fermented at all), the current model returns within 0.002 SG
-of the true gravity of that Brix from 8 to 20 °Bx, and over realistic
-fermentations it implies apparent attenuations of 69–75 %. There's only one
-fermenting-sample model. The parameter that selects it is there so a second can
-be added later without a breaking change.
+Given `OB = FB` (a sample that hasn't fermented at all) it returns within
+0.002 SG of the true gravity of that Brix from 8 to 20 °Bx, so it behaves
+better at the start of a fermentation. Terrill's data show it reading a
+finished beer a few points low, which is why it isn't the default.
 
 ## Hydrometer: temperature correction
 

@@ -88,7 +88,13 @@ import type {
 } from './types';
 import { sgToPlato } from './units/gravity';
 import type { VolumeWaterfall } from './volumes';
-import { infusionVolume, planVolumes, strikeWaterTemperature, volumeWarnings } from './volumes';
+import {
+  applyBoilShrinkage,
+  infusionVolume,
+  planVolumes,
+  strikeWaterTemperature,
+  volumeWarnings,
+} from './volumes';
 import type { SaltSplit, SulfateChlorideBalance } from './water';
 import {
   alkalinityPpm,
@@ -465,7 +471,9 @@ export function calculateRecipe(
   const gravity = predictGravities({
     fermentables: recipe.fermentables,
     volumes: {
-      preBoilVolumeL: volumes.preBoilVolumeL,
+      // The waterfall's pre-boil volume is the hot kettle reading. Gravity is
+      // read on a cooled sample, so it's worked from the same wort at 20 °C.
+      preBoilVolumeL: applyBoilShrinkage(volumes.preBoilVolumeL, equipment.boilShrinkagePercent),
       postBoilVolumeL: volumes.postBoilVolumeL,
       volumeIntoFermenterL: volumes.volumeIntoFermenterL,
     },
@@ -652,6 +660,7 @@ export function calculateRecipe(
       netAttenuationPercent: finalGravity.netApparentAttenuationPercent,
       maxPointLitres: gravity.maxPointLitres,
       totalPointLitres: gravity.totalPointLitres,
+      boilShrinkagePercent: equipment.boilShrinkagePercent,
     }),
     warnings,
   };
@@ -871,6 +880,7 @@ interface ExplanationContext {
   readonly netAttenuationPercent: Percent;
   readonly maxPointLitres: number;
   readonly totalPointLitres: number;
+  readonly boilShrinkagePercent: Percent;
 }
 
 function buildExplanations(ctx: ExplanationContext): Record<string, Explanation> {
@@ -891,9 +901,13 @@ function buildExplanations(ctx: ExplanationContext): Record<string, Explanation>
     preBoilGravity: explain(vitals.preBoilGravity, {
       label: 'Pre-boil gravity',
       formula: 'extract-bookkeeping',
-      expression: 'SG = 1 + (Σ kg × PPG × 8.345404 × efficiency) / preBoilVolume / 1000',
+      expression: 'SG = 1 + (Σ kg × PPG × 8.345404 × efficiency) / preBoilVolume at 20 °C / 1000',
       inputs: {
         preBoilVolumeL: round(volumes.preBoilVolumeL, 2),
+        cooledPreBoilVolumeL: round(
+          applyBoilShrinkage(volumes.preBoilVolumeL, ctx.boilShrinkagePercent),
+          2,
+        ),
         mashEfficiencyPercent: vitals.mashEfficiencyPercent,
       },
       unit: 'SG',

@@ -112,8 +112,8 @@ describe('Recipe guide', () => {
   it('prints the brew-day readings', () => {
     const { og, fg, strength } = gravityExample();
     expect(printed(og, 3)).toBe('1.052');
-    expect(printed(fg, 3)).toBe('1.011');
-    expect(printed(strength, 1)).toBe('5.5');
+    expect(printed(fg, 3)).toBe('1.012');
+    expect(printed(strength, 1)).toBe('5.4');
   });
 });
 

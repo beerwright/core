@@ -253,7 +253,15 @@ export interface ProofAndSweetenResult {
  *
  * **A sugar target that doesn't fit.** Past some sweetness the sugar alone
  * takes more volume than the target strength leaves, so the two targets are
- * incompatible. We return `null` instead of a negative volume of water.
+ * incompatible. We return `null` instead of a negative volume of water. A
+ * thin syrup can do the same with a sugar target that dry sugar would meet,
+ * because the syrup's own water uses up the room.
+ *
+ * **A syrup at 100 °Bx or more.** That is dry sugar, or a typing mistake.
+ * Past 100 the syrup would have less than no water in it, and the sum would
+ * hand some of it back as water to add.
+ *
+ * {@link proofAndSweetenRefusal} says which of these it was.
  *
  * A jar with no volume, no alcohol, or a zero target also returns `null`,
  * since the calculation would divide by zero.
@@ -274,7 +282,7 @@ export function proofAndSweeten(input: ProofAndSweetenInput): ProofAndSweetenRes
   let syrupL = 0;
   let syrupWaterL = 0;
   if (sweetener.kind === 'syrup' && sugarKg > 0) {
-    if (!(sweetener.brix > 0)) return null;
+    if (!(sweetener.brix > 0 && sweetener.brix < 100)) return null;
     syrupL = sugarKg / syrupSugarKgPerL(sweetener.brix);
     // The syrup's own water: its volume minus the volume its sugar takes up
     // at the syrup's concentration, not the drink's. This is why
@@ -295,6 +303,39 @@ export function proofAndSweeten(input: ProofAndSweetenInput): ProofAndSweetenRes
     finalAbvPercent: (volumeL * abvPercent) / finalVolumeL,
     finalSugarGL: (sugarKg * 1000) / finalVolumeL,
   };
+}
+
+/**
+ * A sentence saying why {@link proofAndSweeten} returned `null`, or `null` if
+ * it didn't, or if the jar isn't described yet.
+ *
+ * The function returns `null` for several different reasons and a caller
+ * showing the result needs to say which. The sentences are here so every
+ * caller explains the same refusal the same way. An empty jar, a jar with no
+ * alcohol, a zero target or a syrup with no strength gets no sentence,
+ * because that is a form somebody is still filling in.
+ *
+ * @category Blending, mead and spirits
+ * @group Calculations
+ */
+export function proofAndSweetenRefusal(input: ProofAndSweetenInput): string | null {
+  if (proofAndSweeten(input) !== null) return null;
+  const { volumeL, abvPercent, targetAbvPercent, targetSugarGL, sweetener } = input;
+  if (!(volumeL > 0) || !(abvPercent > 0) || !(targetAbvPercent > 0)) return null;
+  if (!(targetSugarGL >= 0)) return null;
+  if (targetAbvPercent >= abvPercent) {
+    return 'You cannot reach a strength higher than what is already in the jar by adding water. Lower the target, or start with something stronger.';
+  }
+  if (sweetener.kind === 'syrup') {
+    if (!(sweetener.brix > 0)) return null;
+    if (sweetener.brix >= 100) {
+      return 'A syrup has to be under 100 °Bx, because at 100 it would be dry sugar. Check the syrup’s strength, or switch to sugar.';
+    }
+    if (proofAndSweeten({ ...input, sweetener: { kind: 'sugar' } }) !== null) {
+      return 'That syrup brings more water than the target strength leaves room for. Use a stronger syrup or dry sugar, or aim for a lower strength.';
+    }
+  }
+  return 'That much sugar does not fit in the volume that strength allows. Aim for less sugar, or a lower strength.';
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +407,7 @@ const OIML_A = [
 ] as const;
 
 const OIML_B = [
-  -2.061851e-1, -5.268254e-3, 3.613001e-5, -3.89577e-8, 7.169354e-9, -9.973923e-11,
+  -2.0618513e-1, -5.2682542e-3, 3.6130013e-5, -3.8957702e-7, 7.169354e-9, -9.9739231e-11,
 ] as const;
 
 const OIML_C: readonly (readonly number[])[] = [
@@ -551,7 +592,7 @@ export interface SpiritMixResult {
  * With no liquids, a strength outside 0–100 %, or a temperature outside the
  * formula's −20 to 40 °C. And when negative amounts take out more than is
  * there: if the total mass isn't above zero, or the alcohol left is less than
- * none or more than all of it.
+ * none or more than all of it. {@link mixSpiritsRefusal} says which.
  *
  * @category Blending, mead and spirits
  * @group Start here
@@ -583,6 +624,35 @@ export function mixSpirits(components: readonly SpiritMixComponent[]): SpiritMix
     pureAlcoholL: Math.max(0, ethanolKg) / ETHANOL_DENSITY_20C_KG_PER_L,
     additiveVolumeL,
   };
+}
+
+/**
+ * A sentence saying why {@link mixSpirits} returned `null`, or `null` if it
+ * didn't, or if there is nothing in the mix yet.
+ *
+ * A strength or a temperature outside what the formula covers is checked
+ * first, because either one stops the sum before the amounts are looked at.
+ * After that the only way to get no answer from real numbers is a negative
+ * amount that takes out more than went in. No liquids, or amounts that are
+ * all zero, get no sentence.
+ *
+ * @category Blending, mead and spirits
+ * @group Calculations
+ */
+export function mixSpiritsRefusal(components: readonly SpiritMixComponent[]): string | null {
+  if (mixSpirits(components) !== null) return null;
+  if (components.some(({ abvPercent }) => !(abvPercent >= 0 && abvPercent <= 100))) {
+    return 'A strength has to be between 0 and 100 %. Check those rows.';
+  }
+  const outOfRange = ({ unit, tempC }: SpiritMixComponent) =>
+    unit === 'L' && !(tempC >= OIML_MIN_TEMP_C && tempC <= OIML_MAX_TEMP_C);
+  if (components.some(outOfRange)) {
+    return 'We can only correct a volume measured between −20 and 40 °C. Check those temperatures, or weigh the liquid instead.';
+  }
+  if (components.some(({ amount }) => amount < 0)) {
+    return 'Your negative amounts take out more than you put in, so there is nothing left for us to work out. Check those rows.';
+  }
+  return null;
 }
 
 /**

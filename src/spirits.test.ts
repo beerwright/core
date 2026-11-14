@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { waterDensityKgPerM3 } from './corrections';
 import {
   abvToMassFraction,
   dissolvedSugarVolumeLPerKg,
@@ -6,8 +7,10 @@ import {
   massFractionToAbv,
   mixSpirits,
   mixSpiritsExplained,
+  mixSpiritsRefusal,
   proofAndSweeten,
   proofAndSweetenExplained,
+  proofAndSweetenRefusal,
   sugarConcentrationToBrix,
 } from './spirits';
 
@@ -271,5 +274,95 @@ describe('mixSpirits', () => {
     expect(explanation?.inputs.liquid2).toBe('1 L at 20 °C, 0 %');
     expect(explanation?.family).toBe('spirits');
     expect(mixSpiritsExplained([])).toBeNull();
+  });
+});
+
+describe('the OIML water term away from 20 °C', () => {
+  it('agrees with Kell for plain water across the fitted range', () => {
+    // At zero strength only the B coefficients are in play, so this pins each
+    // of them against an independent density equation. B4 was once a factor
+    // of ten out, which put water 0.05 g/L heavy at 40 °C.
+    for (const tempC of [0, 4, 10, 30, 40]) {
+      const gap = ethanolWaterDensityKgPerL(0, tempC) - waterDensityKgPerM3(tempC) / 1000;
+      expect(Math.abs(gap)).toBeLessThan(2e-5);
+    }
+  });
+});
+
+describe('proofAndSweetenRefusal', () => {
+  const jar = {
+    volumeL: 1,
+    abvPercent: 60,
+    targetAbvPercent: 30,
+    targetSugarGL: 150,
+    sweetener: { kind: 'sugar' },
+  } as const;
+
+  it('says nothing when there is an answer', () => {
+    expect(proofAndSweetenRefusal(jar)).toBeNull();
+  });
+
+  it('says nothing about a jar nobody has described yet', () => {
+    expect(proofAndSweetenRefusal({ ...jar, volumeL: 0 })).toBeNull();
+    expect(proofAndSweetenRefusal({ ...jar, sweetener: { kind: 'syrup', brix: 0 } })).toBeNull();
+  });
+
+  it('names a target above the strength in the jar', () => {
+    expect(proofAndSweetenRefusal({ ...jar, targetAbvPercent: 70 })).toMatch(
+      /cannot reach a strength higher/,
+    );
+  });
+
+  it('names sugar that does not fit', () => {
+    expect(proofAndSweetenRefusal({ ...jar, targetAbvPercent: 55, targetSugarGL: 300 })).toMatch(
+      /sugar does not fit/,
+    );
+  });
+
+  /**
+   * 300 g of sugar from a 10 °Bx syrup: a litre holds
+   * `0.10 × 1.040 × 0.9982 = 0.1038 kg`, so it takes 2.89 L of syrup, and the
+   * finished drink is only 2 L. Dry sugar fits with room to spare.
+   */
+  it('names a syrup too thin for a sugar target that dry sugar would meet', () => {
+    const thin = { ...jar, sweetener: { kind: 'syrup', brix: 10 } } as const;
+    expect(proofAndSweeten(thin)).toBeNull();
+    expect(proofAndSweetenRefusal(thin)).toMatch(/syrup brings more water/);
+  });
+
+  it.each([100, 120])('refuses a syrup at %d °Bx', (brix) => {
+    const input = { ...jar, sweetener: { kind: 'syrup', brix } } as const;
+    expect(proofAndSweeten(input)).toBeNull();
+    expect(proofAndSweetenRefusal(input)).toMatch(/under 100 °Bx/);
+  });
+});
+
+describe('mixSpiritsRefusal', () => {
+  const litres = (amount: number, abvPercent: number, tempC = 20) =>
+    ({ amount, unit: 'L', tempC, abvPercent }) as const;
+
+  it('says nothing when there is an answer, or nothing to mix', () => {
+    expect(mixSpiritsRefusal([litres(1, 96), litres(1, 0)])).toBeNull();
+    expect(mixSpiritsRefusal([])).toBeNull();
+    expect(mixSpiritsRefusal([litres(0, 40), litres(0, 0)])).toBeNull();
+  });
+
+  it('names negative amounts that take out more than went in', () => {
+    expect(mixSpirits([litres(1, 40), litres(-2, 0)])).toBeNull();
+    expect(mixSpiritsRefusal([litres(1, 40), litres(-2, 0)])).toMatch(/take out more/);
+  });
+
+  it('names a strength outside 0 to 100 % ahead of the negative amount', () => {
+    expect(mixSpiritsRefusal([litres(20, 40), litres(-2, 140)])).toMatch(/between 0 and 100 %/);
+  });
+
+  it('names a temperature the density formula does not cover', () => {
+    expect(mixSpiritsRefusal([litres(1, 96), litres(1, 0, 60)])).toMatch(/between −20 and 40 °C/);
+  });
+
+  it('ignores the temperature of a liquid that was weighed', () => {
+    expect(
+      mixSpiritsRefusal([litres(1, 96), { amount: 1, unit: 'kg', tempC: 60, abvPercent: 0 }]),
+    ).toBeNull();
   });
 });

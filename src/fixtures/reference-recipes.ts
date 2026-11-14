@@ -161,7 +161,8 @@ export const REFERENCE_RECIPE_A: RecipeInput = {
  * ## Gravity
  *
  * ```
- * pre-boil SG = 1 + 1081.86 / 25.4375 / 1000 = 1.04253
+ * pre-boil SG = 1 + 1081.86 / 24.420 / 1000 = 1.04430
+ *   (25.4375 L in the kettle hot is 24.420 L at 20 °C, and a sample is read cool)
  * OG          = 1 + 1081.86 / 21.540  / 1000 = 1.05023
  * brewhouse%  = 100 × 50.23 × 20 / 1442.48   = 69.64 %
  * ```
@@ -235,7 +236,7 @@ export const REFERENCE_A_EXPECTED = {
   palePpg: 35.4924,
   crystalPpg: 32.8304,
   maxPointLitres: 1442.48,
-  preBoilGravity: 1.04253,
+  preBoilGravity: 1.0443,
   og: 1.05023,
   brewhouseEfficiencyPercent: 69.638,
   originalExtractPlato: 12.4412,
@@ -359,7 +360,8 @@ export const REFERENCE_RECIPE_B: RecipeInput = {
  * ## Gravity
  *
  * ```
- * pre-boil SG = 1 + (64.79 + 36.10) / 25.000 / 1000 = 1.00404
+ * pre-boil SG = 1 + (64.79 + 36.10) / 24.000 / 1000 = 1.00420
+ *   (25.000 L hot is 24.000 L at 20 °C)
  *   (the extract and lactose haven't gone in yet, so this is the steep runnings)
  * OG          = 1 + 1348.52 / 21.120 / 1000         = 1.06385
  * ```
@@ -407,7 +409,7 @@ export const REFERENCE_B_EXPECTED = {
   preBoilVolumeL: 25.0,
   postBoilVolumeL: 21.12,
   packagedVolumeL: 19.0,
-  preBoilGravity: 1.00404,
+  preBoilGravity: 1.0042,
   og: 1.06385,
   netApparentAttenuationPercent: 64.2,
   originalExtractPlato: 15.6372,

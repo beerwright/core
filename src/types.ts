@@ -884,6 +884,16 @@ export interface WaterProfile {
   /** Measured pH of the water as drawn. Used to work out how much of the alkalinity titrates. */
   readonly ph?: number;
   /**
+   * How much of the alkalinity in {@link bicarbonatePpm} is hydroxide, mEq/L.
+   *
+   * Slaked lime is stored as its bicarbonate equivalent so every profile has
+   * one alkalinity number. Bicarbonate gives up about 89 % of its alkalinity
+   * by mash pH and hydroxide gives up all of it, so the mash pH model needs to
+   * know which is which. `applySalts` sets this on the waters it returns.
+   * Absent means none, which is right for any water as drawn.
+   */
+  readonly hydroxideMEqPerL?: number;
+  /**
    * Ions the analysis never printed, as distinct from ions it printed as zero.
    *
    * RO water has 0 ppm sulfate, but a utility report that leaves the row out

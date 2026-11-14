@@ -74,6 +74,7 @@ import {
   alkalinityMEqPerLitre,
   alkalinityPpm,
   CACO3_EQUIVALENT_WEIGHT,
+  hydroxideMEqPerLitre,
   ionMEqPerLitre,
   KOLBACH_CALCIUM_DIVISOR,
   KOLBACH_MAGNESIUM_DIVISOR,
@@ -685,12 +686,12 @@ export const DEFAULT_ACIDULATED_MALT_PERCENT_LACTIC = 3;
 
 const ACIDULATED_PATTERN = /acid(ulated)?\s*malt|sauermalz|s[äa]uremalz/i;
 const ROASTED_PATTERN =
-  /roast|black\s*malt|black\s*patent|chocolate|carafa|patent|midnight|blackprinz|coffee\s*malt|de-?husked/i;
+  /roast|black\s*malt|black\s*barley|black\s*patent|chocolate|carafa|patent|midnight|blackprinz|coffee\s*malt|de-?husked/i;
 const CRYSTAL_PATTERN = /crystal|caramel|cara[a-z]*|special\s*b|honey\s*malt|melanoid/i;
 const MUNICH_PATTERN =
   /munich|münchner|vienna|wiener|aromatic|biscuit|victory|amber\s*malt|brown\s*malt/i;
 const WHEAT_OTHER_PATTERN =
-  /wheat|weizen|rye|roggen|oat|hafer|spelt|flaked|torrified|raw\s|corn|maize|rice|barley\b(?!.*roast)/i;
+  /wheat|weizen|rye|roggen|oat|hafer|spelt|flaked|torrified|raw\s|unmalted|pearl(ed)?\s*barley|corn|maize|rice/i;
 
 /**
  * Work out which titration curve a fermentable follows.
@@ -851,7 +852,8 @@ export interface MashPhInput {
   /**
    * The water in the mash tun, after dilution and after all mineral salts.
    * Bicarbonate from baking soda, chalk or slaked lime goes here and not in
-   * `acidAdditions`, otherwise it gets counted twice.
+   * `acidAdditions`, otherwise it gets counted twice. Slaked lime's share is
+   * marked by the profile's `hydroxideMEqPerL`, which `applySalts` sets.
    */
   readonly water: WaterProfile;
   /** Mash water volume, litres. */
@@ -939,8 +941,27 @@ function waterBaseMEq(ctx: BalanceContext, ph: number): number {
   if (ctx.alkalinityModel === 'full-alkalinity') {
     return ctx.alkalinityMEqPerL * ctx.mashVolumeL;
   }
+  // `totalCarbonateMMol` was worked out from the carbonate share alone, so
+  // `remaining` is what the bicarbonate still holds at this pH. Hydroxide
+  // holds nothing back.
   const remaining = alkalinityAtPh(ctx.totalCarbonateMMol, ph);
   return (ctx.alkalinityMEqPerL - remaining) * ctx.mashVolumeL;
+}
+
+/**
+ * Splits a profile's alkalinity into hydroxide and carbonate, mEq/L.
+ *
+ * The hydroxide figure is capped at the total, so a profile edited by hand
+ * can't claim more hydroxide than it has alkalinity.
+ */
+function splitAlkalinity(water: WaterProfile): {
+  readonly totalMEqPerL: number;
+  readonly hydroxideMEqPerL: number;
+  readonly carbonateMEqPerL: number;
+} {
+  const totalMEqPerL = alkalinityMEqPerLitre(water);
+  const hydroxideMEqPerL = Math.min(Math.max(water.hydroxideMEqPerL ?? 0, 0), totalMEqPerL);
+  return { totalMEqPerL, hydroxideMEqPerL, carbonateMEqPerL: totalMEqPerL - hydroxideMEqPerL };
 }
 
 /** Acid supplied by everything that is not the grist buffer, mEq. */
@@ -1002,7 +1023,8 @@ export function predictMashPh(input: MashPhInput): MashPhResult {
   const acidulatedLacticMMol = titrations.reduce((sum, t) => sum + t.lacticAcidMMol, 0);
 
   const waterPh = input.water.ph ?? options.assumedSourceWaterPh;
-  const alkMEqPerL = alkalinityMEqPerLitre(input.water);
+  const alkalinity = splitAlkalinity(input.water);
+  const alkMEqPerL = alkalinity.totalMEqPerL;
   const ctx: BalanceContext = {
     titrations,
     totalBufferingMEqPerPh,
@@ -1011,7 +1033,7 @@ export function predictMashPh(input: MashPhInput): MashPhResult {
     calciumMEqPerL: ionMEqPerLitre(input.water, 'calcium'),
     magnesiumMEqPerL: ionMEqPerLitre(input.water, 'magnesium'),
     alkalinityMEqPerL: alkMEqPerL,
-    totalCarbonateMMol: totalCarbonateMMolPerLitre(alkMEqPerL, waterPh),
+    totalCarbonateMMol: totalCarbonateMMolPerLitre(alkalinity.carbonateMEqPerL, waterPh),
     waterPh,
     alkalinityModel: options.alkalinityModel,
     acidAdditions: (input.acidAdditions ?? []).filter((a) => (a.target ?? 'mash') !== 'sparge'),
@@ -1426,8 +1448,12 @@ function applyAgentToWater(
   if (agent.kind !== 'alkali' || amount === 0 || volumeL <= 0) return water;
   const perGramPerLitre = saltIonPpmPerGramPerLitre(agent.salt);
   const factor = amount / volumeL;
+  const hydroxideMEqPerL =
+    (water.hydroxideMEqPerL ?? 0) +
+    hydroxideMEqPerLitre([{ salt: agent.salt, grams: amount }], volumeL);
   return {
     ...water,
+    ...(hydroxideMEqPerL > 0 ? { hydroxideMEqPerL } : {}),
     calciumPpm: water.calciumPpm + perGramPerLitre.calcium * factor,
     magnesiumPpm: water.magnesiumPpm + perGramPerLitre.magnesium * factor,
     sodiumPpm: water.sodiumPpm + perGramPerLitre.sodium * factor,
@@ -1549,8 +1575,9 @@ export function acidifyWater(input: {
   const sourcePh =
     input.profile.ph ?? input.assumedSourceWaterPh ?? DEFAULT_MASH_PH_OPTIONS.assumedSourceWaterPh;
 
-  const alkMEqPerL = alkalinityMEqPerLitre(input.profile);
-  const totalCarbonate = totalCarbonateMMolPerLitre(alkMEqPerL, sourcePh);
+  const alkalinity = splitAlkalinity(input.profile);
+  const alkMEqPerL = alkalinity.totalMEqPerL;
+  const totalCarbonate = totalCarbonateMMolPerLitre(alkalinity.carbonateMEqPerL, sourcePh);
   const remaining = alkalinityAtPh(totalCarbonate, targetPh);
   const milliequivalents = Math.max(0, (alkMEqPerL - remaining) * input.volumeL);
 

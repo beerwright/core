@@ -62,6 +62,7 @@ import {
   TECHNIQUES_HOME_WINEMAKING_PH,
   TONSMEIRE_BLENDING_2014,
 } from './sources';
+import { abvToMassFraction, ethanolWaterDensityKgPerL } from './spirits';
 import type { Celsius, Litres, SpecificGravity } from './types';
 import { sgToGravityPoints } from './units/gravity';
 import { kgToPounds, poundsToKg } from './units/mass';
@@ -616,7 +617,12 @@ export interface BlendEvaluation {
   readonly taGramsPerLitre: number | null;
   /** Volume-weighted color, in SRM. */
   readonly srm: number | null;
-  /** Alcohol by volume before additions, in percent. Uses the measured FG when there is one. */
+  /**
+   * Alcohol by volume of the blend as it stands, in percent. Uses the measured
+   * FG when there is one. Additions that went in before that reading are part
+   * of what was measured, so they're counted here. Later ones are counted in
+   * {@link abvWithAdditions}.
+   */
   readonly abv: number | null;
   /** Blend pH from the components' hydrogen-ion concentration (see {@link blendPh}). */
   readonly ph: number | null;
@@ -875,13 +881,33 @@ export function evaluateBlend(input: BlendInput): BlendEvaluation {
     countedFruit.reduce((s, i) => s + i.volumeL, 0) +
     countedSpirit.reduce((s, i) => s + i.volumeL, 0);
   const measuredVolumeL = totalVolumeL + countedVolumeL;
+  // Extract adds up in point·litres, so the starting gravity of what was in
+  // the vessel at the reading is everything's points over the whole volume.
+  // The components are thinned by the juice and spirit poured in with them. A
+  // spirit is lighter than water, so it brings negative points, which is how
+  // it pulls the hydrometer down without anything having fermented.
+  const countedSpiritPointLitres = countedSpirit.reduce(
+    (s, i) => s + sgToGravityPoints(spiritGravity(i.abvPercent)) * i.volumeL,
+    0,
+  );
   const effectiveOg =
     og === null || measuredVolumeL <= 0
       ? og
-      : og + sucrosePointLitres(countedSucroseKg) / 1000 / measuredVolumeL;
+      : 1 +
+        (sgToGravityPoints(og) * totalVolumeL +
+          sucrosePointLitres(countedSucroseKg) +
+          countedSpiritPointLitres) /
+          1000 /
+          measuredVolumeL;
+  // The gravity drop only shows the alcohol that fermented. A spirit's own
+  // alcohol was never sugar in this vessel, so it's added on top.
+  const countedSpiritAbv =
+    measuredVolumeL > 0
+      ? countedSpirit.reduce((s, i) => s + i.volumeL * i.abvPercent, 0) / measuredVolumeL
+      : 0;
   const abv =
     measuredFg !== null && effectiveOg !== null && effectiveOg > measuredFg
-      ? abvAdvanced(effectiveOg, measuredFg)
+      ? abvAdvanced(effectiveOg, measuredFg) + countedSpiritAbv
       : componentAbv;
 
   const priming =
@@ -1072,6 +1098,17 @@ function sucroseGravityRise(sucroseKg: number, volumeL: Litres): number {
   const points =
     (kgToPounds(sucroseKg) / litresToGallons(volumeL)) * SUCROSE_POINTS_PER_POUND_PER_GALLON;
   return points / 1000;
+}
+
+/**
+ * Specific gravity of a spirit of a given strength, treated as ethanol and
+ * water at 20 °C. A 40 % spirit comes to about 0.948.
+ */
+function spiritGravity(abvPercent: number): SpecificGravity {
+  const strength = Math.min(100, Math.max(0, abvPercent));
+  return (
+    ethanolWaterDensityKgPerL(abvToMassFraction(strength), 20) / ethanolWaterDensityKgPerL(0, 20)
+  );
 }
 
 function minFinite(values: readonly (number | null)[]): number | null {

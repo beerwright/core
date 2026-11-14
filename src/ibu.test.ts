@@ -650,3 +650,29 @@ describe('buGuRatio', () => {
     expect(buGuRatio(40, 1.0)).toBe(0);
   });
 });
+
+describe('whirlpool model "none" under every formula', () => {
+  const stand: HopAddition = {
+    name: 'Citra',
+    amountKg: 0.05,
+    alphaAcidPercent: 12,
+    form: 'pellet',
+    use: 'whirlpool',
+    timeMinutes: 20,
+    whirlpoolTempC: 80,
+  };
+
+  it.each(['tinseth', 'rager', 'garetz'] as const)('%s gives a stand 0 IBU', (ibuFormula) => {
+    // Rager's curve gives 5 % utilization at zero minutes, so setting the
+    // minutes to zero is not enough to switch the stand off.
+    const result = calculateIbu({
+      hops: [stand],
+      volumeL: 20,
+      boilGravity: 1.05,
+      boilTimeMinutes: 60,
+      options: { ibuFormula, whirlpool: { model: 'none' } },
+    });
+    expect(result.ibu).toBe(0);
+    expect(result.contributions[0]?.utilizationFraction).toBe(0);
+  });
+});

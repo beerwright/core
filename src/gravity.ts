@@ -352,7 +352,11 @@ export function fermentableStage(
  * @group Inputs
  */
 export interface GravityVolumes {
-  /** Wort volume at the start of the boil, hot. */
+  /**
+   * Wort volume at the start of the boil, corrected to 20 °C like the other
+   * two. A gravity sample is read cool, so dividing by the hot kettle volume
+   * would put the pre-boil gravity about 4 % of its points low.
+   */
   readonly preBoilVolumeL: Litres;
   /** Wort volume at the end of the boil, corrected to 20 °C. */
   readonly postBoilVolumeL: Litres;

@@ -76,7 +76,7 @@ A hydrometer sample at 32 °C that reads 1.048, and refractometer readings of
 {@includeCode ../examples/gravity.ts#readings}
 
 The warm sample is really 1.052. The refractometer's final reading works out
-to 1.011, and the beer is 5.5 % ABV.
+to 1.012, and the beer is 5.4 % ABV.
 
 ## Traps
 

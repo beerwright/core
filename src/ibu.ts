@@ -545,8 +545,17 @@ function contributionFor(
     const model = options.whirlpool.model;
     const startTempC = hop.whirlpoolTempC ?? FALLBACK_WHIRLPOOL_TEMP_C;
     if (model === 'none') {
-      effectiveMinutes = 0;
+      // Returned here and not passed on as zero minutes, because Rager's curve
+      // gives 5 % utilisation at zero minutes and would still count the hops.
       notes.push('Whirlpool model "none": stand additions contribute 0 IBU.');
+      return {
+        ...base,
+        ...idPart,
+        ibu: 0,
+        utilizationFraction: 0,
+        effectiveBoilMinutes: 0,
+        notes,
+      };
     } else if (model === 'fixed-temperature') {
       effectiveMinutes = fixedTemperatureStandEffectiveBoilMinutes(hop.timeMinutes, startTempC);
       describeStand = (ibu) => heldStand(hop, startTempC, effectiveMinutes, ibu);

@@ -49,31 +49,59 @@ describe('refractometer wort correction', () => {
 
 describe('refractometer fermenting-sample correction (Terrill linear)', () => {
   /**
-   * Golden values, computed longhand from
-   * `FG = 1.001843 − 0.002318474·OB − 0.000007775·OB² − 0.000000034·OB³
-   *              + 0.00574·FB + 0.00003344·FB² + 0.000000086·FB³`
+   * Golden values, computed longhand from Terrill's published fit,
+   * `FG = 1.0000 − 0.00085683·OB + 0.0034941·FB`.
+   *
+   * OB = 12, FB = 6.5:
+   * ```
+   * 1 − 0.01028196 + 0.02271165 = 1.01242969
+   * ```
+   * **Tolerance: 0.00005 SG.**
+   */
+  it.each([
+    [12, 6.5, 1.01243],
+    [12, 7, 1.01418],
+    [16, 9, 1.01774],
+  ])('OB %f, FB %f → FG %f', (ob, fb, fg) => {
+    expect(refractometerFinalGravity(ob, fb)).toBeCloseTo(fg, 4);
+  });
+
+  /**
+   * The older correlation, kept as a named model.
    *
    * OB = 12, FB = 6.5:
    * ```
    * 1.001843 − 0.0278217 − 0.0011196 − 0.0000588
    *          + 0.0373100 + 0.0014129 + 0.0000236 = 1.01159
    * ```
-   * **Tolerance: 0.00005 SG.**
    */
   it.each([
     [12, 6.5, 1.01159],
     [12, 7, 1.01466],
     [16, 9, 1.017],
-  ])('OB %f, FB %f → FG %f', (ob, fb, fg) => {
-    expect(refractometerFinalGravity(ob, fb)).toBeCloseTo(fg, 4);
+  ])('standard cubic: OB %f, FB %f → FG %f', (ob, fb, fg) => {
+    expect(refractometerFinalGravity(ob, fb, 'standard-cubic')).toBeCloseTo(fg, 4);
   });
 
-  it('stays physical across the brewing range when no fermentation happened', () => {
-    // Fed OB = FB, the model should land near the true gravity of that Brix.
+  it('standard cubic lands near the true gravity when no fermentation happened', () => {
     for (const brix of [8, 12, 16, 20]) {
-      const modelled = refractometerFinalGravity(brix, brix);
+      const modelled = refractometerFinalGravity(brix, brix, 'standard-cubic');
       const trueGravity = refractometerToGravity(brix, 1);
       expect(Math.abs(modelled - trueGravity)).toBeLessThan(0.0025);
+    }
+  });
+
+  it('reads a finished beer higher than the standard cubic, as Terrill measured', () => {
+    for (const [ob, fb] of [
+      [12, 6],
+      [14, 7],
+      [16, 8],
+      [20, 10],
+    ] as const) {
+      const gap =
+        refractometerFinalGravity(ob, fb) - refractometerFinalGravity(ob, fb, 'standard-cubic');
+      expect(gap).toBeGreaterThan(0.001);
+      expect(gap).toBeLessThan(0.008);
     }
   });
 

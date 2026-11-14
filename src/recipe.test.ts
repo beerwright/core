@@ -499,3 +499,24 @@ describe('keg hops in the volume waterfall', () => {
     expect(keg.volumes.packagedVolumeL).toBeLessThan(plain.volumes.packagedVolumeL);
   });
 });
+
+describe('pre-boil gravity is a cooled-sample figure', () => {
+  it('holds the same extract as the post-boil wort once both volumes are at 20 °C', () => {
+    // Nothing is added in the boil, so the extract before and after is the
+    // same. A hydrometer sample is read cool, so the pre-boil gravity has to
+    // be worked from the pre-boil volume at 20 °C, not the hot kettle volume.
+    const result = calculateRecipe({
+      batchVolumeL: 20,
+      boilTimeMinutes: 60,
+      fermentables: [
+        { name: 'Pale', amountKg: 4.5, ppg: 37, colorLovibond: 2, class: 'grain', use: 'mash' },
+      ],
+      hops: [],
+    });
+    const { volumes, vitals } = result;
+    const shrink = volumes.postBoilVolumeL / volumes.postBoilVolumeHotL;
+    const preBoilPointLitres = (vitals.preBoilGravity - 1) * volumes.preBoilVolumeL * shrink;
+    const postBoilPointLitres = (vitals.og - 1) * volumes.postBoilVolumeL;
+    expect(preBoilPointLitres).toBeCloseTo(postBoilPointLitres, 9);
+  });
+});

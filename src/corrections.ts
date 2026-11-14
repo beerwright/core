@@ -69,14 +69,15 @@ export function refractometerToGravity(
 /**
  * Which fermenting-sample model to run.
  *
- * Only Terrill's linear regression is implemented. The union lets a second
- * model be added without a breaking signature change, but a new model has to
- * pass the validation described on {@link refractometerFinalGravity} first.
+ * `terrill-linear` is Sean Terrill's 2011 linear fit and is the default.
+ * `standard-cubic` is the older correlation that brewing software used before
+ * it, which Terrill's post measures his fits against. See
+ * {@link refractometerFinalGravity} for where each one holds.
  *
  * @category Gravity and ABV
  * @group Inputs
  */
-export type FermentingSampleModel = 'terrill-linear';
+export type FermentingSampleModel = 'terrill-linear' | 'standard-cubic';
 
 /**
  * True gravity of a fermenting or finished sample from two refractometer
@@ -84,29 +85,40 @@ export type FermentingSampleModel = 'terrill-linear';
  *
  * Alcohol refracts far more strongly than sugar, so a refractometer reading
  * taken after fermentation has started is meaningless unless the correction
- * also knows the original reading. Sean Terrill's linear regression
- * (seanterrill.com, "Refractometer FG Results") against measured hydrometer
- * data:
+ * also knows the original reading. The default is Sean Terrill's linear
+ * regression (seanterrill.com, "Refractometer FG Results") against measured
+ * hydrometer data:
+ *
+ * ```
+ * FG = 1.0000 − 0.00085683·OB + 0.0034941·FB
+ * ```
+ *
+ * `OB` and `FB` are the readings in °Bx divided by the wort correction
+ * factor, which is how Terrill defines them. Use
+ * {@link refractometerFinalGravityRaw} to pass uncorrected instrument readings.
+ *
+ * ## Where it holds
+ *
+ * Terrill fitted it to beers that had fermented most of the way and checked
+ * it against 68 sets of readings from eight brewers. He left out four beers
+ * under about 61 % apparent attenuation because no correlation came close on
+ * them. So it is a final-gravity formula. On a sample early in fermentation
+ * it reads low, and for a wort that hasn't fermented at all it is about 17
+ * points low at 12 °Bx.
+ *
+ * ## The older correlation
+ *
+ * `standard-cubic` is the formula most brewing software used before 2011:
  *
  * ```
  * FG = 1.001843 − 0.002318474·OB − 0.000007775·OB² − 0.000000034·OB³
  *               + 0.00574·FB    + 0.00003344·FB²  + 0.000000086·FB³
  * ```
  *
- * `OB` and `FB` are wort-correction-factor-adjusted Brix, which is how
- * Brewer's Friend and Brewfather apply the model. Use
- * {@link refractometerFinalGravityRaw} to pass uncorrected instrument readings.
- *
- * ## Validation
- *
- * A model has to give physically sensible results across the brewing range,
- * and this one does. Given `OB = FB` (a sample that hasn't fermented at all)
- * it returns within 0.002 SG of the true gravity of that Brix from 8 to
- * 20 °Bx, and over realistic fermentations it implies apparent attenuations
- * of 69–75 %. We tried a second, widely circulated "Terrill cubic" and
- * rejected it. As transcribed it returns SG below 1.000 and implied
- * attenuations above 100 % for strong beers, so its coefficients can't be
- * right.
+ * Given `OB = FB` it returns within 0.002 SG of the true gravity of that
+ * Brix from 8 to 20 °Bx, so it behaves better at the start of a
+ * fermentation. Terrill's data show it reading a finished beer a few points
+ * low, which is why it isn't the default.
  *
  * @category Gravity and ABV
  * @group Calculations
@@ -114,19 +126,22 @@ export type FermentingSampleModel = 'terrill-linear';
 export function refractometerFinalGravity(
   originalCorrectedBrix: number,
   finalCorrectedBrix: number,
-  _model: FermentingSampleModel = 'terrill-linear',
+  model: FermentingSampleModel = 'terrill-linear',
 ): SpecificGravity {
   const ob = originalCorrectedBrix;
   const fb = finalCorrectedBrix;
-  return (
-    1.001843 -
-    0.002318474 * ob -
-    0.000007775 * ob ** 2 -
-    0.000000034 * ob ** 3 +
-    0.00574 * fb +
-    0.00003344 * fb ** 2 +
-    0.000000086 * fb ** 3
-  );
+  if (model === 'standard-cubic') {
+    return (
+      1.001843 -
+      0.002318474 * ob -
+      0.000007775 * ob ** 2 -
+      0.000000034 * ob ** 3 +
+      0.00574 * fb +
+      0.00003344 * fb ** 2 +
+      0.000000086 * fb ** 3
+    );
+  }
+  return 1 - 0.00085683 * ob + 0.0034941 * fb;
 }
 
 /**
@@ -645,8 +660,7 @@ export function refractometerFinalGravityExplained(
   return explain(fg, {
     label: 'Final gravity from a refractometer',
     formula: 'terrill-linear',
-    expression:
-      'FG = 1.001843 − 0.002318474·OB − 0.000007775·OB² − 0.000000034·OB³ + 0.00574·FB + 0.00003344·FB² + 0.000000086·FB³',
+    expression: 'FG = 1.0000 − 0.00085683·OB + 0.0034941·FB',
     inputs: {
       originalMeasuredBrix: roundTo(originalMeasuredBrix, 2),
       finalMeasuredBrix: roundTo(finalMeasuredBrix, 2),
@@ -657,8 +671,8 @@ export function refractometerFinalGravityExplained(
     unit: 'SG',
     notes: [
       'Alcohol refracts far more strongly than sugar, so a reading taken after fermentation started is meaningless without the starting point.',
-      "OB and FB are wort-correction-factor-adjusted Brix, which is how Brewer's Friend and Brewfather apply the same model.",
-      'A widely circulated "Terrill cubic" variant returns gravities below 1.000 for strong beers and is not used here.',
+      'OB and FB are the two readings divided by the wort correction factor, which is how Terrill defines them.',
+      'The fit is for beer that has fermented most of the way. Below about 60 % apparent attenuation it reads low, so treat a reading from early in fermentation as rough.',
     ],
     family: 'corrections',
     sources: [TERRILL_REFRACTOMETER_2011],

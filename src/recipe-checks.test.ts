@@ -543,9 +543,9 @@ describe('pitch rate', () => {
   });
 
   it('tolerates a pitch a little under target rather than reporting model noise', () => {
-    // Three pack strengths against the same 177 bn target, either side of the
-    // two thresholds: 161 bn is 91 % and gives nothing, 138 bn is 78 % and a
-    // note, 92 bn is 52 % and a warning. The first one is within tolerance. A
+    // Three pack strengths against the same 187 bn target, either side of the
+    // two thresholds: 172.5 bn is 92 % and gives nothing, 149.5 bn is 80 % and
+    // a note, 92 bn is 49 % and a warning. The first one is within tolerance. A
     // pitch rate is built on an estimated viability, a round number printed on
     // a pack and a volume nobody has measured yet, so 91 % is within the
     // model's own error.
@@ -564,8 +564,8 @@ describe('pitch rate', () => {
         },
       ],
     });
-    expect(find(checks({ recipe: at(7), now: NOW }).findings, 'pitch-short')).toBeUndefined();
-    expect(find(checks({ recipe: at(6), now: NOW }).findings, 'pitch-short')?.severity).toBe(
+    expect(find(checks({ recipe: at(7.5), now: NOW }).findings, 'pitch-short')).toBeUndefined();
+    expect(find(checks({ recipe: at(6.5), now: NOW }).findings, 'pitch-short')?.severity).toBe(
       'note',
     );
     expect(find(checks({ recipe: at(4), now: NOW }).findings, 'pitch-short')?.severity).toBe(
@@ -730,5 +730,64 @@ describe('the order findings come back in', () => {
       'ferment-temp-outside-yeast',
       'style-band',
     ]);
+  });
+});
+
+describe('the pitch volume', () => {
+  /** One fresh liquid pack in a lager, so the cell-count check has something to say. */
+  const lager: RecipeInput = {
+    ...REFERENCE_RECIPE_A,
+    yeasts: [
+      {
+        name: 'W-34/70',
+        type: 'lager',
+        form: 'liquid',
+        attenuationMinPercent: 75,
+        attenuationMaxPercent: 82,
+        packs: 1,
+        manufactureDate: new Date('2026-08-25T00:00:00Z'),
+      },
+    ],
+  };
+
+  it('is the whole fermenter volume, whatever the trub loss', () => {
+    // The yeast ferments everything in the fermenter. What stays behind with
+    // the trub is lost at packaging, after the yeast has done its work. So
+    // the cells wanted per litre in the fermenter don't depend on that loss.
+    const cellsWantedPerLitre = (fermenterTrubLossL: number) => {
+      const equipment = { ...REFERENCE_EQUIPMENT, fermenterTrubLossL };
+      const intoFermenterL = calculateRecipe(lager, equipment).volumes.volumeIntoFermenterL;
+      const finding = find(checks({ recipe: lager, equipment, now: NOW }).findings, 'pitch-short');
+      if (finding === undefined) throw new Error('expected a short pitch');
+      const achievedShare = finding.achievedPitchRate / finding.targetPitchRate;
+      return finding.shortfallBillion / (1 - achievedShare) / intoFermenterL;
+    };
+    expect(cellsWantedPerLitre(3)).toBeCloseTo(cellsWantedPerLitre(0), 6);
+  });
+});
+
+describe('acid malt recognized by its name', () => {
+  it('counts as an adjustment the brewer has already made', () => {
+    // A row typed in by hand has a name and no pH data. The mash pH
+    // prediction already treats it as acid malt, and the check has to agree.
+    const recipe: RecipeInput = {
+      ...REFERENCE_RECIPE_A,
+      water: { sourceProfile: MUNICH.profile },
+      fermentables: [
+        ...REFERENCE_RECIPE_A.fermentables,
+        {
+          name: 'Acidulated Malt',
+          amountKg: 0.02,
+          class: 'grain',
+          use: 'mash',
+          extractFineGrindDryBasisPercent: 78,
+          moisturePercent: 5,
+          colorLovibond: 3,
+        },
+      ],
+    };
+    const finding = find(checks({ recipe }).findings, 'mash-ph-out-of-band');
+    expect(finding).toBeDefined();
+    expect(finding?.acidAdded).toBe(true);
   });
 });
