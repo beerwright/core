@@ -16,7 +16,7 @@ for each step, and what the pulls cost in time and water.
   against the mash the one before it left behind.
 
 {@link DECOCTION_SCHEDULES} has the traditional schedules ready to use
-(Hochkurz, double and Bohemian triple), and {@link findDecoctionSchedule}
+(Hochkurz single and double, double and Bohemian triple), and {@link findDecoctionSchedule}
 looks one up by id. A recipe whose mash steps include a `decoction` step gets
 its plan from {@link calculateRecipe} in `decoctions`.
 

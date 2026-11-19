@@ -154,7 +154,12 @@ describe('the technique vocabulary', () => {
   });
 
   it('carries the decoction schedules across rather than restating them', () => {
-    for (const id of ['mash-hochkurz-single', 'mash-double', 'mash-triple-bohemian']) {
+    for (const id of [
+      'mash-hochkurz-single',
+      'mash-hochkurz-double',
+      'mash-double',
+      'mash-triple-bohemian',
+    ]) {
       expect(byId(id), id).toBeDefined();
     }
     // The steps are unchanged by the adaptation. It's the same data, renamed.

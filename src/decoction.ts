@@ -276,7 +276,7 @@ export interface DecoctionIssue {
  * @category Decoction
  * @group Results
  */
-export type DecoctionQuantityKind = 'volume' | 'temperature' | 'thickness';
+export type DecoctionQuantityKind = 'volume' | 'temperature' | 'thickness' | 'mass';
 
 /**
  * One number quoted inside a {@link DecoctionIssue}, in the unit core stores.
@@ -287,11 +287,11 @@ export type DecoctionQuantityKind = 'volume' | 'temperature' | 'thickness';
 export interface DecoctionQuantity {
   /** What the number measures, which decides the unit it's converted to. */
   readonly kind: DecoctionQuantityKind;
-  /** Canonical: litres, °C, or L/kg. */
+  /** Canonical: litres, °C, L/kg, or kilograms. */
   readonly value: number;
   /**
    * Decimal places the **canonical** rendering rounds to, overriding the
-   * default for the kind (volume 1, temperature 1, thickness 2).
+   * default for the kind (volume 1, temperature 1, thickness 2, mass 2).
    *
    * Set only where a message needs a fixed precision. The return temperature of
    * an unreachable target is quoted to the whole degree. A display formatter
@@ -346,6 +346,7 @@ const CANONICAL_PRECISION: Readonly<Record<DecoctionQuantityKind, number>> = {
   volume: 1,
   temperature: 1,
   thickness: 2,
+  mass: 2,
 };
 
 /** A quantity in the units this package stores, as {@link DecoctionIssue.message} shows it. */
@@ -359,6 +360,8 @@ function canonicalQuantity(quantity: DecoctionQuantity): string {
       return `${value} °C`;
     case 'thickness':
       return `${value} L/kg`;
+    case 'mass':
+      return `${value} kg`;
   }
 }
 
@@ -902,18 +905,34 @@ function pullIssues(a: {
 }): readonly DecoctionIssue[] {
   const issues: DecoctionIssue[] = [];
 
-  if (
-    a.heatCapacityLEquivalent > a.mashCapacityL + EPSILON ||
-    a.pullGrainKg > a.G + EPSILON ||
-    a.pullWaterL > a.W + EPSILON
-  ) {
+  const moreHeatThanTheMash = a.heatCapacityLEquivalent > a.mashCapacityL + EPSILON;
+  const moreGrainThanTheMash = a.pullGrainKg > a.G + EPSILON;
+  const moreWaterThanTheMash = a.pullWaterL > a.W + EPSILON;
+  if (moreGrainThanTheMash && !moreHeatThanTheMash) {
+    // The usual way to get here is a thick pull out of a thin mash, full-volume
+    // BIAB for one. The pull fits the tun easily and a thinner one would work,
+    // so the sentence names the grain and leaves the tun out of it.
+    issues.push(
+      quantifiedIssue({
+        code: 'pull-exceeds-mash',
+        severity: 'error',
+        short: 'Not enough grain',
+        template:
+          'A pull this thick needs {pullGrain} of grain and the mash has {mashGrain}. Take a thinner pull or split the step.',
+        quantities: {
+          pullGrain: { kind: 'mass', value: a.pullGrainKg },
+          mashGrain: { kind: 'mass', value: a.G },
+        },
+      }),
+    );
+  } else if (moreHeatThanTheMash || moreGrainThanTheMash || moreWaterThanTheMash) {
     issues.push(
       quantifiedIssue({
         code: 'pull-exceeds-mash',
         severity: 'error',
         short: 'Bigger than the mash',
         template:
-          'The step needs {pullVolume} of mash pulled, which is more than the tun holds. Split the step or use a thinner pull.',
+          'The step needs {pullVolume} of mash pulled, which is more than the whole mash. Split the step.',
         quantities: { pullVolume: { kind: 'volume', value: a.pullVolumeL } },
       }),
     );
@@ -1247,10 +1266,10 @@ export interface DecoctionSchedulePreset {
  *   rest is full of unconverted starch, and boiling unconverted starch sets it
  *   and loses the extract. Traditional practice holds the pull near 70 °C
  *   until it converts, then boils it; the presets do the same.
- * - **The triple's last pull is thin.** By that point there's nothing to gain
- *   from boiling more grain, and the pull is only there to raise the
- *   temperature. Here a grain-free pull is traditional practice, not a
- *   shortcut.
+ * - **The last pull of the triple and of the Hochkurz double is thin.** By
+ *   that point there's nothing to gain from boiling more grain, and the pull
+ *   is only there to raise the temperature. Here a grain-free pull is
+ *   traditional practice, not a shortcut.
  *
  * @category Decoction
  * @group Constants and defaults
@@ -1275,6 +1294,34 @@ export const DECOCTION_SCHEDULES: readonly DecoctionSchedulePreset[] = [
         },
       },
       { name: 'Mash-out', type: 'temperature', targetTempC: 78, timeMinutes: 10 },
+    ],
+  },
+  {
+    id: 'hochkurz-double',
+    name: 'Hochkurz, double decoction',
+    description:
+      'The Hochkurz single with a second, thin pull to reach mash-out. Two decoctions with no protein rest, for well-modified malt.',
+    steps: [
+      { name: 'Maltose rest', type: 'infusion', targetTempC: 63, timeMinutes: 40 },
+      {
+        name: 'Saccharification',
+        type: 'decoction',
+        targetTempC: 72,
+        timeMinutes: 20,
+        decoction: {
+          thickness: 'thick',
+          boilMinutes: 15,
+          restBeforeBoil: { tempC: 70, minutes: 10 },
+        },
+      },
+      {
+        name: 'Mash-out',
+        type: 'decoction',
+        targetTempC: 76,
+        timeMinutes: 10,
+        // Thin, as in the triple. This pull only has to carry heat.
+        decoction: { thickness: 'thin', boilMinutes: 10 },
+      },
     ],
   },
   {

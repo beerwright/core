@@ -264,6 +264,28 @@ describe('decoctionPull feasibility', () => {
     );
   });
 
+  it('says it is the grain that runs out, and how much the mash has', () => {
+    // A brewer read "more than the tun holds" as the tun's volume and went to
+    // check the equipment profile. The pull fits the tun easily. It asks for
+    // more grain than the recipe has.
+    const pull = at({ thickness: 'thick' }, { targetTempC: 78 });
+    const issue = pull.issues.find((i) => i.code === 'pull-exceeds-mash');
+    expect(issue?.message).toBe(
+      `A pull this thick needs ${pull.pullGrainKg.toFixed(2)} kg of grain and the mash has 4.90 kg. Take a thinner pull or split the step.`,
+    );
+    expect(issue?.short).toBe('Not enough grain');
+  });
+
+  it('does not blame the tun when the step is too big for any pull', () => {
+    // 97 °C from a pull that comes back at 98 °C and has boiled some of itself
+    // away takes more heat than the whole mash holds, at any thickness.
+    const issue = at({ thickness: 'thin' }, { currentTempC: 40, targetTempC: 97 }).issues.find(
+      (i) => i.code === 'pull-exceeds-mash',
+    );
+    expect(issue?.message).toMatch(/more than the whole mash/);
+    expect(issue?.message).not.toMatch(/tun holds|thinner/);
+  });
+
   it('flags a pull that will not fit the pot', () => {
     expect(codes(at(undefined, { potVolumeL: 2 }).issues)).toContain('pull-exceeds-pot');
     expect(codes(at(undefined, { potVolumeL: 30 }).issues)).not.toContain('pull-exceeds-pot');
@@ -487,6 +509,18 @@ describe('DECOCTION_SCHEDULES', () => {
     expect(findDecoctionSchedule('nope')).toBeUndefined();
   });
 
+  it('has a Hochkurz double: the single, with the mash-out as a second, thin pull', () => {
+    const single = findDecoctionSchedule('hochkurz-single');
+    const double = findDecoctionSchedule('hochkurz-double');
+    expect(double?.name).toBe('Hochkurz, double decoction');
+    // The same mash up to the saccharification rest.
+    expect(double?.steps.slice(0, 2)).toEqual(single?.steps.slice(0, 2));
+    const out = double?.steps.at(-1);
+    expect(out?.type).toBe('decoction');
+    expect(out?.decoction?.thickness).toBe('thin');
+    expect(double?.steps.filter((step) => step.type === 'decoction')).toHaveLength(2);
+  });
+
   it('gives every preset a unique id and a rising temperature schedule', () => {
     const ids = DECOCTION_SCHEDULES.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -561,6 +595,8 @@ describe('issue wording', () => {
     const plans = [
       // A pull bigger than the mash, and the scorch note with it.
       decoctionPull({ ...MASH, currentTempC: 40, targetTempC: 95 }),
+      // A step too big for any pull, which gets the other wording.
+      decoctionPull({ ...MASH, currentTempC: 40, targetTempC: 97, spec: { thickness: 'thin' } }),
       // Unreachable. This one returns before the feasibility checks run, so
       // the pot case needs a target the mash can reach.
       decoctionPull({ ...MASH, currentTempC: 52, targetTempC: 99 }),
@@ -672,8 +708,9 @@ describe('issue wording', () => {
 
 /** Canonical units, the way the module's own messages are written. */
 function canonical(quantity: DecoctionQuantity): string {
-  const decimals = quantity.precision ?? (quantity.kind === 'thickness' ? 2 : 1);
-  const unit = { volume: 'L', temperature: '°C', thickness: 'L/kg' }[quantity.kind];
+  const twoPlaces = quantity.kind === 'thickness' || quantity.kind === 'mass';
+  const decimals = quantity.precision ?? (twoPlaces ? 2 : 1);
+  const unit = { volume: 'L', temperature: '°C', thickness: 'L/kg', mass: 'kg' }[quantity.kind];
   return `${quantity.value.toFixed(decimals)} ${unit}`;
 }
 

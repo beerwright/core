@@ -163,20 +163,21 @@ reached. A Hochkurz mash infuses to 63 °C and decocts from there, so
 `planDecoctions` takes every rest in the schedule. Given only the decoctions,
 it would size from the wrong rest.
 
-Three named schedules are included in `DECOCTION_SCHEDULES`, and
+Four named schedules are included in `DECOCTION_SCHEDULES`, and
 `findDecoctionSchedule` looks one up by id:
 
 | Schedule | Shape |
 | --- | --- |
 | Hochkurz, single decoction | 63 °C maltose rest, one thick pull to 72 °C, mash out at 78 °C |
+| Hochkurz, double decoction | 63 °C maltose rest, one thick pull to 72 °C, one thin pull to mash out at 76 °C |
 | Double decoction | 52 °C protein rest, two thick pulls, mash out at 78 °C |
 | Triple decoction, Bohemian | Mash in at 37 °C, three pulls, mash out at 76 °C |
 
 Every thick pull in every preset holds a conversion rest near 70 °C before it
 boils. A pull taken from a protein rest is full of unconverted starch, and
-boiling unconverted starch sets it and loses the extract. The Bohemian triple's
-last pull is **thin**, which is traditional: by then there's nothing to gain
-from boiling more grain.
+boiling unconverted starch sets it and loses the extract. The last pull of the
+Bohemian triple and of the Hochkurz double is **thin**, which is traditional:
+by then there's nothing to gain from boiling more grain.
 
 ## What the engine doesn't model
 
