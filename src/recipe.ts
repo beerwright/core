@@ -91,7 +91,11 @@ import type { VolumeWaterfall } from './volumes';
 import {
   applyBoilShrinkage,
   infusionVolume,
+  isOverBoiling,
+  minimumStrikeWater,
   planVolumes,
+  strikeOverBoilingWarning,
+  strikeWaterRaisedWarning,
   strikeWaterTemperature,
   volumeWarnings,
 } from './volumes';
@@ -339,6 +343,13 @@ export interface RecipeCalculation {
   /** Strike water temperature for the first mash step, °C. Absent for extract recipes. */
   readonly strikeTemperatureC?: number;
   /**
+   * The strike volume the mash thickness asked for, litres. Only present when
+   * that volume would have needed water hotter than boiling and
+   * `volumes.strikeWaterL` was raised to the least that boiling water can do
+   * the job with. The sparge gives up the difference.
+   */
+  readonly strikeWaterRaisedFromL?: number;
+  /**
    * Every decoction the mash schedule calls for, sized. Only present when the
    * schedule has a `decoction` step. No other number depends on it for an
    * infusion mash.
@@ -452,19 +463,63 @@ export function calculateRecipe(
     equipment.decoctionBoilOffLPerHour,
   );
 
-  const volumes = planVolumes(
-    recipe.batchVolumeL,
-    recipe.batchVolumeBasis ?? 'fermenter',
-    equipment,
-    {
-      grainKg,
-      kettleHopKg,
-      dryHopKg,
-      boilTimeMinutes: recipe.boilTimeMinutes,
-      mashThicknessLPerKg,
-      decoctionEvaporationL,
-    },
-  );
+  const volumeInputs = {
+    grainKg,
+    kettleHopKg,
+    dryHopKg,
+    boilTimeMinutes: recipe.boilTimeMinutes,
+    decoctionEvaporationL,
+  };
+  const batchVolumeBasis = recipe.batchVolumeBasis ?? 'fermenter';
+  const requestedVolumes = planVolumes(recipe.batchVolumeL, batchVolumeBasis, equipment, {
+    ...volumeInputs,
+    mashThicknessLPerKg,
+  });
+
+  // --- Strike temperature --------------------------------------------------
+  // Strike water has to hit the first rest the grain meets, even if it's a
+  // protein rest, not the schedule's fermentability-weighted mean.
+  const firstRestTempC = recipe.mashSteps?.find((s) => s.type !== 'sparge')?.targetTempC ?? 66.7;
+  const strikeHeat = {
+    grainTempC: recipe.grainTemperatureC ?? 20,
+    targetMashTempC: firstRestTempC,
+    tunThermalMassLEquivalent: equipment.mashTunThermalMassLEquivalent,
+    tunTempC: equipment.mashTunInitialTempC,
+    grainKg,
+  };
+
+  // A thick mash at a hot rest can ask for strike water above boiling. When
+  // it does, we move water from the sparge into the mash until boiling water
+  // is enough. `planVolumes` caps the strike at the batch's total water, so a
+  // full-volume mash, which has no sparge, comes back unchanged. A rest at or
+  // above boiling has no volume that works and is left alone too.
+  const boilingStrikeL = grainKg > 0 ? minimumStrikeWater(strikeHeat) : 0;
+  const volumes =
+    Number.isFinite(boilingStrikeL) && boilingStrikeL > requestedVolumes.strikeWaterL
+      ? planVolumes(recipe.batchVolumeL, batchVolumeBasis, equipment, {
+          ...volumeInputs,
+          mashThicknessLPerKg: boilingStrikeL / grainKg,
+        })
+      : requestedVolumes;
+  const strikeWaterRaisedFromL =
+    volumes.strikeWaterL > requestedVolumes.strikeWaterL
+      ? requestedVolumes.strikeWaterL
+      : undefined;
+  const strikeTemperatureC =
+    grainKg > 0 && volumes.strikeWaterL > 0
+      ? strikeWaterTemperature({
+          ...strikeHeat,
+          mashThicknessLPerKg: volumes.strikeWaterL / grainKg,
+        })
+      : undefined;
+  if (strikeWaterRaisedFromL !== undefined) {
+    warnings.push(
+      strikeWaterRaisedWarning(strikeWaterRaisedFromL, volumes.strikeWaterL, firstRestTempC),
+    );
+  }
+  if (strikeTemperatureC !== undefined && isOverBoiling(strikeTemperatureC)) {
+    warnings.push(strikeOverBoilingWarning(strikeTemperatureC, firstRestTempC));
+  }
   warnings.push(...volumeWarnings(volumes, equipment));
 
   // --- Gravity -------------------------------------------------------------
@@ -581,22 +636,6 @@ export function calculateRecipe(
     };
   });
 
-  // --- Strike temperature --------------------------------------------------
-  // Strike water has to hit the first rest the grain meets, even if it's a
-  // protein rest, not the schedule's fermentability-weighted mean.
-  const firstRestTempC = recipe.mashSteps?.find((s) => s.type !== 'sparge')?.targetTempC;
-  const strikeTemperatureC =
-    grainKg > 0 && volumes.strikeWaterL > 0
-      ? strikeWaterTemperature({
-          grainTempC: recipe.grainTemperatureC ?? 20,
-          targetMashTempC: firstRestTempC ?? 66.7,
-          mashThicknessLPerKg: volumes.strikeWaterL / grainKg,
-          tunThermalMassLEquivalent: equipment.mashTunThermalMassLEquivalent,
-          tunTempC: equipment.mashTunInitialTempC,
-          grainKg,
-        })
-      : undefined;
-
   // --- Decoctions ----------------------------------------------------------
   // These are sized against the strike volume, so they come after the
   // waterfall. The evaporation term above is the part that had to come first.
@@ -605,7 +644,7 @@ export function calculateRecipe(
       ? planDecoctions({
           mashWaterL: volumes.strikeWaterL,
           mashGrainKg: grainKg,
-          startTempC: firstRestTempC ?? 66.7,
+          startTempC: firstRestTempC,
           steps: decoctionSchedule(recipe.mashSteps ?? [], volumes.strikeWaterL, grainKg),
           grainAbsorptionLPerKg: equipment.grainAbsorptionLPerKg,
           standingLossCPerHour: equipment.mashStandingLossCPerHour,
@@ -644,6 +683,7 @@ export function calculateRecipe(
     fermentables,
     hops: ibuResult.contributions,
     ...(strikeTemperatureC !== undefined ? { strikeTemperatureC } : {}),
+    ...(strikeWaterRaisedFromL !== undefined ? { strikeWaterRaisedFromL } : {}),
     ...(decoctions !== undefined ? { decoctions } : {}),
     ...(water !== undefined ? { water } : {}),
     explain: buildExplanations({

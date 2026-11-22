@@ -34,6 +34,7 @@
 
 import { decoctionPull } from './decoction';
 import {
+  BOILING_WATER_C,
   GRAIN_DISPLACEMENT_L_PER_KG,
   GRAIN_SPECIFIC_HEAT_RATIO,
   resolveEquipmentProfile,
@@ -542,6 +543,100 @@ export function strikeWaterTemperature(input: StrikeTemperatureInput): Celsius {
     temp += (tunMass * (input.targetMashTempC - tunTempC)) / waterL;
   }
   return temp;
+}
+
+/**
+ * Input to {@link minimumStrikeWater}.
+ *
+ * @category Gravity and ABV
+ * @group Inputs
+ */
+export interface MinimumStrikeWaterInput {
+  /** Grain temperature at dough-in, °C. */
+  readonly grainTempC: Celsius;
+  /** Target mash rest temperature, °C. */
+  readonly targetMashTempC: Celsius;
+  /** Grain mass, kg. */
+  readonly grainKg: Kilograms;
+  /** The hottest the strike water can be, °C. Defaults to boiling, 100. */
+  readonly maxWaterTempC?: Celsius;
+  /** Ratio of grain to water specific heat. Defaults to 0.4. */
+  readonly grainSpecificHeatRatio?: number;
+  /** Mash tun thermal mass as equivalent litres of water. Defaults to 0. */
+  readonly tunThermalMassLEquivalent?: Litres;
+  /** Mash tun temperature before dough-in, °C. Defaults to the grain temperature. */
+  readonly tunTempC?: Celsius;
+}
+
+/**
+ * The least strike water that reaches a rest without being hotter than
+ * `maxWaterTempC`, litres.
+ *
+ * This is {@link strikeWaterTemperature}'s energy balance solved for the
+ * volume with the water temperature fixed at the ceiling:
+ *
+ * ```
+ * V = (c × G × (T₂ − T_g) + M × (T₂ − T_t)) / (T_max − T₂)
+ * ```
+ *
+ * A thick mash at a hot rest can ask for strike water above boiling. Less
+ * water has to carry the same heat, so it has to be hotter, and below this
+ * volume no water that exists is hot enough. Returns `Infinity` for a rest at
+ * or above the ceiling, and 0 when the grain and tun need no heating.
+ *
+ * @category Gravity and ABV
+ * @group Calculations
+ */
+export function minimumStrikeWater(input: MinimumStrikeWaterInput): Litres {
+  const c = input.grainSpecificHeatRatio ?? GRAIN_SPECIFIC_HEAT_RATIO;
+  const maxTempC = input.maxWaterTempC ?? BOILING_WATER_C;
+  const tunMass = input.tunThermalMassLEquivalent ?? 0;
+  const tunTempC = input.tunTempC ?? input.grainTempC;
+  const heat =
+    c * input.grainKg * (input.targetMashTempC - input.grainTempC) +
+    tunMass * (input.targetMashTempC - tunTempC);
+  if (heat <= 0) return 0;
+  if (maxTempC <= input.targetMashTempC) return Infinity;
+  return heat / (maxTempC - input.targetMashTempC);
+}
+
+/**
+ * True when water would have to be hotter than boiling.
+ *
+ * The margin keeps a strike volume solved to land on exactly 100 °C from
+ * reading as over it after rounding in the arithmetic.
+ *
+ * @category Gravity and ABV
+ * @group Calculations
+ */
+export function isOverBoiling(waterTempC: Celsius): boolean {
+  return waterTempC > BOILING_WATER_C + 1e-6;
+}
+
+/**
+ * The warning `calculateRecipe` gives when it raised the strike volume so
+ * that boiling water reaches the first rest. See {@link minimumStrikeWater}.
+ *
+ * @category Gravity and ABV
+ * @group Calculations
+ */
+export function strikeWaterRaisedWarning(
+  requestedStrikeWaterL: Litres,
+  strikeWaterL: Litres,
+  restTempC: Celsius,
+): string {
+  return `Strike water raised from ${requestedStrikeWaterL.toFixed(1)} L to ${strikeWaterL.toFixed(1)} L so that boiling water reaches the ${restTempC} °C rest.`;
+}
+
+/**
+ * The warning `calculateRecipe` gives when the strike water would have to be
+ * hotter than boiling and there is no more water to add to the mash.
+ *
+ * @category Gravity and ABV
+ * @group Calculations
+ */
+export function strikeOverBoilingWarning(strikeTemperatureC: Celsius, restTempC: Celsius): string {
+  return `Strike water would have to be ${strikeTemperatureC.toFixed(0)} °C, hotter than boiling, to reach the ${restTempC} °C rest.`;
 }
 
 /**

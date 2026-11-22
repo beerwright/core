@@ -520,3 +520,64 @@ describe('pre-boil gravity is a cooled-sample figure', () => {
     expect(preBoilPointLitres).toBeCloseTo(postBoilPointLitres, 9);
   });
 });
+
+describe('strike water that would have to be hotter than boiling', () => {
+  // The mock turbid's first rest. 4.9 kg of grain from 20 °C to 74 °C takes
+  // 0.4 × 4.9 × 54 = 105.84 L·°C, and boiling water has 26 °C to give, so the
+  // least strike water that works is 105.84 / 26 = 4.0708 L.
+  const hot = (thicknessLPerKg: number): RecipeInput => ({
+    ...REFERENCE_RECIPE_A,
+    mashSteps: [
+      { name: 'Hot saccharification', type: 'infusion', targetTempC: 74, timeMinutes: 15 },
+    ],
+    mashThicknessLPerKg: thicknessLPerKg,
+  });
+
+  it('raises the strike volume until boiling water reaches the rest', () => {
+    // 0.7 L/kg asks for 3.43 L, which would need 74 + (0.4 / 0.7) × 54 = 104.9 °C.
+    const result = calculateRecipe(hot(0.7), REFERENCE_EQUIPMENT);
+    expect(result.volumes.strikeWaterL).toBeCloseTo(4.0708, 3);
+    expect(result.strikeTemperatureC).toBeCloseTo(100, 6);
+    expect(result.strikeWaterRaisedFromL).toBeCloseTo(3.43, 6);
+  });
+
+  it('takes the extra strike water out of the sparge', () => {
+    const thick = calculateRecipe(hot(0.7), REFERENCE_EQUIPMENT);
+    const reference = calculateRecipe(hot(3), REFERENCE_EQUIPMENT);
+    expect(thick.volumes.totalWaterL).toBeCloseTo(reference.volumes.totalWaterL, 9);
+    expect(thick.volumes.spargeWaterL).toBeCloseTo(thick.volumes.totalWaterL - 4.0708, 3);
+    expect(thick.vitals.og).toBeCloseTo(reference.vitals.og, 9);
+  });
+
+  it('says so in the warnings', () => {
+    const result = calculateRecipe(hot(0.7), REFERENCE_EQUIPMENT);
+    expect(result.warnings).toContain(
+      'Strike water raised from 3.4 L to 4.1 L so that boiling water reaches the 74 °C rest.',
+    );
+  });
+
+  it('leaves a mash alone when its strike water is under boiling', () => {
+    const result = calculateRecipe(hot(3), REFERENCE_EQUIPMENT);
+    expect(result.volumes.strikeWaterL).toBeCloseTo(14.7, 6);
+    expect(result.strikeWaterRaisedFromL).toBeUndefined();
+    expect(result.warnings.some((warning) => warning.startsWith('Strike water'))).toBe(false);
+  });
+
+  it('reports the temperature when all the water is already in the mash', () => {
+    // A full-volume mash has no sparge to borrow from. A cold tun worth 20 L of
+    // water needs 20 × 54 = 1080 L·°C on top of the grain's 105.84.
+    const equipment = {
+      ...REFERENCE_EQUIPMENT,
+      spargeType: 'no-sparge' as const,
+      mashTunThermalMassLEquivalent: 20,
+      mashTunInitialTempC: 20,
+    };
+    const result = calculateRecipe(hot(3), equipment);
+    const strikeL = result.volumes.strikeWaterL;
+    expect(strikeL).toBeCloseTo(result.volumes.totalWaterL, 9);
+    expect(result.strikeWaterRaisedFromL).toBeUndefined();
+    expect(result.strikeTemperatureC).toBeCloseTo(74 + (105.84 + 1080) / strikeL, 6);
+    expect(result.strikeTemperatureC).toBeGreaterThan(100);
+    expect(result.warnings.some((warning) => warning.includes('hotter than boiling'))).toBe(true);
+  });
+});

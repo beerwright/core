@@ -199,6 +199,53 @@ describe('mash tun capacity', () => {
   });
 });
 
+describe('strike water', () => {
+  // The mock turbid's first rest on the reference grist: 4.9 kg from 20 °C to
+  // 74 °C needs at least 0.4 × 4.9 × 54 / 26 = 4.0708 L of boiling water.
+  const hot = (mashThicknessLPerKg: number): RecipeInput => ({
+    ...WELL_PITCHED,
+    mashSteps: [
+      { name: 'Hot saccharification', type: 'infusion', targetTempC: 74, timeMinutes: 15 },
+    ],
+    mashThicknessLPerKg,
+  });
+
+  it('says nothing when the strike water is under boiling', () => {
+    const { findings } = checks({ recipe: hot(3) });
+    expect(find(findings, 'strike-water-raised')).toBeUndefined();
+    expect(find(findings, 'strike-over-boiling')).toBeUndefined();
+  });
+
+  it('notes a strike volume that was raised to keep the water at boiling', () => {
+    const { findings, supersedes } = checks({ recipe: hot(0.7) });
+    const finding = find(findings, 'strike-water-raised');
+    expect(finding?.severity).toBe('note');
+    expect(finding?.requestedStrikeWaterL).toBeCloseTo(3.43, 6);
+    expect(finding?.strikeWaterL).toBeCloseTo(4.0708, 3);
+    expect(finding?.restTempC).toBe(74);
+    expect(find(findings, 'strike-over-boiling')).toBeUndefined();
+    expect(supersedes).toContain(
+      'Strike water raised from 3.4 L to 4.1 L so that boiling water reaches the 74 °C rest.',
+    );
+  });
+
+  it('warns when the whole batch of water at boiling still falls short', () => {
+    const equipment = {
+      spargeType: 'no-sparge' as const,
+      mashTunThermalMassLEquivalent: 20,
+      mashTunInitialTempC: 20,
+    };
+    const { findings, supersedes } = checks({ recipe: hot(3), equipment });
+    const finding = find(findings, 'strike-over-boiling');
+    expect(finding?.severity).toBe('warning');
+    expect(finding?.restTempC).toBe(74);
+    expect(finding?.strikeTemperatureC).toBeGreaterThan(100);
+    expect(find(findings, 'strike-water-raised')).toBeUndefined();
+    const engine = calculateRecipe(hot(3), { ...REFERENCE_EQUIPMENT, ...equipment }).warnings;
+    expect(supersedes.filter((line) => engine.includes(line))).toHaveLength(1);
+  });
+});
+
 describe('fermenter headspace', () => {
   it('says nothing when a quarter of the vessel is free', () => {
     // 20 L into a 26.67 L fermenter leaves exactly 25 %.

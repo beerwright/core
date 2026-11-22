@@ -47,7 +47,12 @@ import type {
   RecipeInput,
   SpecificGravity,
 } from './types';
-import { volumeWarningEntries } from './volumes';
+import {
+  isOverBoiling,
+  strikeOverBoilingWarning,
+  strikeWaterRaisedWarning,
+  volumeWarningEntries,
+} from './volumes';
 import { dryPitchPlan, pitchPlan } from './yeast';
 
 // ---------------------------------------------------------------------------
@@ -251,6 +256,33 @@ export type RecipeCheck =
       readonly overflowL: Litres;
     })
   /**
+   * The mash thickness asked for less strike water than boiling water can
+   * reach the first rest with, so the calculation raised it. The sparge gives
+   * up the difference.
+   */
+  | (CheckBase & {
+      /** Which check this is. */
+      readonly id: 'strike-water-raised';
+      /** The strike volume the mash thickness asked for, in liters. */
+      readonly requestedStrikeWaterL: Litres;
+      /** The strike volume the calculation uses, in liters. */
+      readonly strikeWaterL: Litres;
+      /** The first rest's temperature, in °C. */
+      readonly restTempC: number;
+    })
+  /**
+   * The strike water would have to be hotter than boiling, and all of the
+   * batch's water is already in the mash.
+   */
+  | (CheckBase & {
+      /** Which check this is. */
+      readonly id: 'strike-over-boiling';
+      /** The temperature the strike water would need, in °C. */
+      readonly strikeTemperatureC: number;
+      /** The first rest's temperature, in °C. */
+      readonly restTempC: number;
+    })
+  /**
    * The fermenter has too little room over the beer. `headspaceL` is negative
    * if the batch doesn't fit at all, which is the `warning` case.
    */
@@ -433,7 +465,7 @@ export interface RecipeCheckInput {
  * @group Results
  */
 export interface RecipeCheckResult {
-  /** The findings, in brew-day order: kettle, mash, fermenter, pH, pitch, ferment temperature, style. */
+  /** The findings, in brew-day order: kettle, mash, strike water, fermenter, pH, pitch, ferment temperature, style. */
   readonly findings: readonly RecipeCheck[];
   /**
    * Engine warning strings that these findings replace.
@@ -457,7 +489,7 @@ export interface RecipeCheckResult {
  *
  * This is pure: the same inputs give the same findings, with no clock and no
  * IO. Findings are ordered by when the problem happens on brew day: kettle,
- * mash, fermenter, pH, pitch, ferment temperature, style. That's the order a
+ * mash, strike water, fermenter, pH, pitch, ferment temperature, style. That's the order a
  * brewer goes through the day in.
  *
  * @category Recipe
@@ -490,7 +522,32 @@ export function recipeChecks(input: RecipeCheckInput): RecipeCheckResult {
       overflowL: volumes.mashVolumeL - mashTunVolumeL,
     });
   }
-  // The engine's warning strings for the two checks above. We take them from
+  // --- Strike water. The engine has already raised the volume if it could, so
+  // the first is a note about what it did and the second is what's left.
+  const restTempC = recipe.mashSteps?.find((step) => step.type !== 'sparge')?.targetTempC ?? 66.7;
+  const { strikeTemperatureC, strikeWaterRaisedFromL } = calculation;
+  if (strikeWaterRaisedFromL !== undefined) {
+    findings.push({
+      id: 'strike-water-raised',
+      severity: 'note',
+      requestedStrikeWaterL: strikeWaterRaisedFromL,
+      strikeWaterL: volumes.strikeWaterL,
+      restTempC,
+    });
+    supersedes.push(
+      strikeWaterRaisedWarning(strikeWaterRaisedFromL, volumes.strikeWaterL, restTempC),
+    );
+  }
+  if (strikeTemperatureC !== undefined && isOverBoiling(strikeTemperatureC)) {
+    findings.push({
+      id: 'strike-over-boiling',
+      severity: 'warning',
+      strikeTemperatureC,
+      restTempC,
+    });
+    supersedes.push(strikeOverBoilingWarning(strikeTemperatureC, restTempC));
+  }
+  // The engine's warning strings for the two capacity checks above. We take them from
   // `volumeWarningEntries` instead of rebuilding them, so they can't drift.
   for (const entry of volumeWarningEntries(volumes, equipment)) {
     if (entry.id === 'kettle-capacity' || entry.id === 'mash-tun-capacity') {

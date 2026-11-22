@@ -9,6 +9,7 @@ import {
   infusionVolume,
   isNoSparge,
   mashThicknessFromStrike,
+  minimumStrikeWater,
   planVolumes,
   projectVolumes,
   removeBoilShrinkage,
@@ -563,5 +564,44 @@ describe('resolveEquipmentProfile', () => {
 
   it('omits optional capacities when not given', () => {
     expect(resolveEquipmentProfile().kettleVolumeL).toBeUndefined();
+  });
+});
+
+describe('minimumStrikeWater', () => {
+  it('is the volume at which the strike water is exactly boiling', () => {
+    const input = { grainTempC: 20, targetMashTempC: 74, grainKg: 4.9 };
+    const litres = minimumStrikeWater(input);
+    expect(litres).toBeCloseTo((0.4 * 4.9 * 54) / 26, 9);
+    expect(
+      strikeWaterTemperature({ ...input, mashThicknessLPerKg: litres / input.grainKg }),
+    ).toBeCloseTo(100, 9);
+  });
+
+  it('counts the heat a cold tun takes', () => {
+    const input = {
+      grainTempC: 20,
+      targetMashTempC: 74,
+      grainKg: 4.9,
+      tunThermalMassLEquivalent: 2,
+      tunTempC: 15,
+    };
+    const litres = minimumStrikeWater(input);
+    expect(litres).toBeCloseTo((0.4 * 4.9 * 54 + 2 * 59) / 26, 9);
+    expect(
+      strikeWaterTemperature({ ...input, mashThicknessLPerKg: litres / input.grainKg }),
+    ).toBeCloseTo(100, 9);
+  });
+
+  it('honours a lower ceiling', () => {
+    const input = { grainTempC: 20, targetMashTempC: 66, grainKg: 5 };
+    expect(minimumStrikeWater({ ...input, maxWaterTempC: 80 })).toBeCloseTo((0.4 * 5 * 46) / 14, 9);
+  });
+
+  it('is zero when the grain is already at the rest', () => {
+    expect(minimumStrikeWater({ grainTempC: 66, targetMashTempC: 66, grainKg: 5 })).toBe(0);
+  });
+
+  it('is infinite for a rest at or above the ceiling', () => {
+    expect(minimumStrikeWater({ grainTempC: 20, targetMashTempC: 100, grainKg: 5 })).toBe(Infinity);
   });
 });

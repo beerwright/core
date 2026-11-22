@@ -63,6 +63,18 @@ export const GRAIN_DISPLACEMENT_L_PER_KG = 0.6676;
 export const GRAIN_SPECIFIC_HEAT_RATIO = 0.4;
 
 /**
+ * The hottest that strike or infusion water can be, **°C**.
+ *
+ * Water boils at 100 °C at sea level. We don't correct for altitude, so a
+ * brewer at 1,500 m, where water boils near 95 °C, gets a ceiling that is a
+ * few degrees generous.
+ *
+ * @category Recipe
+ * @group Constants and defaults
+ */
+export const BOILING_WATER_C = 100;
+
+/**
  * How fast a resting mash loses temperature, **°C per hour**.
  *
  * 2 °C/h suits a lidded, insulated cooler tun. That's the usual vessel for a
